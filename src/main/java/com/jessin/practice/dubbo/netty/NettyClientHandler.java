@@ -1,6 +1,5 @@
 package com.jessin.practice.dubbo.netty;
 
-import com.alibaba.fastjson.JSON;
 import com.jessin.practice.dubbo.transport.DefaultFuture;
 import com.jessin.practice.dubbo.transport.Response;
 import io.netty.channel.ChannelDuplexHandler;
@@ -28,11 +27,9 @@ public class NettyClientHandler extends ChannelDuplexHandler {
      */
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        log.info("收到服务端消息：" + msg);
-        // result字段为JSONObject
-        Response response = JSON.parseObject((String)msg, Response.class);
-        // todo 返回list/map，带复杂key/value的是否有问题
-        DefaultFuture.setResponse(response);
+        //  这里msg直接拿到response，todo 处理心跳request
+        log.info("收到服务端消息：{}", msg);
+        DefaultFuture.setResponse((Response)msg);
     }
 
     /**

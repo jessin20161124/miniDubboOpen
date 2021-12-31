@@ -1,19 +1,21 @@
 package com.jessin.practice.dubbo.transport;
 
-import com.alibaba.fastjson.JSON;
-import com.jessin.practice.dubbo.exception.DubboException;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * zk版本需要与服务端一致
+ * zk版本需要与服务端一致，支持cancel，支持注册callback，
+ * volatile变量，先复制一个临时变量：Response res = response，提高性能
  * @Author: jessin
  * @Date: 19-11-25 下午10:44
  */
 public class DefaultFuture {
     private static Map<Long, DefaultFuture> id2FutureMap = new ConcurrentHashMap<>();
+    private static Map<Long, Request> id2RequestMap = new ConcurrentHashMap<>();
+
 
     private CountDownLatch countDownLatch = new CountDownLatch(1);
 
@@ -21,6 +23,7 @@ public class DefaultFuture {
 
     public DefaultFuture(Request request) {
         id2FutureMap.put(request.getId(), this);
+        id2RequestMap.put(request.getId(), request);
     }
 
     public Response getResponse(long waitMillis) {
@@ -29,16 +32,15 @@ public class DefaultFuture {
             try {
                 countDownLatch.await(waitMillis, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
+                // 忽略中断
                 e.printStackTrace();
             }
             if (System.currentTimeMillis() - start > waitMillis) {
                 throw new RuntimeException("超时了");
             }
         }
-        if (response.isException()) {
-            String exceptionStr = JSON.toJSONString(response.getResult());
-            DubboException dubboException = JSON.parseObject(exceptionStr, DubboException.class);
-            throw dubboException;
+        if (response.getResult() instanceof Exception) {
+            throw new RuntimeException((Exception)response.getResult());
         }
         return response;
     }
@@ -52,10 +54,20 @@ public class DefaultFuture {
         countDownLatch.countDown();
     }
 
+    /**
+     * todo 需要在receive时将该id对应的entry移除，同时如果没有收到响应，应该设置超时移除。。不然map会无限扩大。
+     * todo 支持cancel
+     * @param response
+     */
     public static void setResponse(Response response) {
         DefaultFuture defaultFuture = id2FutureMap.get(response.getId());
         if (defaultFuture != null) {
             defaultFuture.setInnerResponse(response);
         }
+    }
+
+    public static Optional<Request> getRequest(long id) {
+        Request request = id2RequestMap.get(id);
+        return Optional.ofNullable(request);
     }
 }

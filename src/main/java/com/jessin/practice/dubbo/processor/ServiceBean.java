@@ -13,6 +13,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 
 /**
+ * todo 与spring 解耦
  * @Author: jessin
  * @Date: 19-11-27 下午10:31
  */
@@ -55,6 +56,10 @@ public class ServiceBean implements InitializingBean, DisposableBean {
         this.ref = ref;
     }
 
+    /**
+     * todo 在这个阶段注册zk有问题，可能导致流量过早过来，需要迁移到容器启动后再注册
+     * @throws Exception
+     */
     @Override
     public void afterPropertiesSet() throws Exception {
         Class[] interfaces = ref.getClass().getInterfaces();
@@ -76,6 +81,7 @@ public class ServiceBean implements InitializingBean, DisposableBean {
         }
         // 判断什么类型的注册中心
         curatorZookeeperClient = RegistryManager.getCuratorZookeeperClient(miniDubboProperties.getRegistry());
+        // 原生dubbo是个url
         String providerPath = "/miniDubbo/" + interfaceConfig.getGroup() + "/" + clazzName + "/providers" + "/" + NetUtils.getServerIp() + ":" + miniDubboProperties.getPort();
 
         // 注册zk，提炼register方法

@@ -23,6 +23,7 @@ public class ReferenceBeanPostProcessor extends InstantiationAwareBeanPostProces
     @Override
     public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName)
             throws BeansException {
+        // 父类中的@Reference呢？？方法是否支持这个注解注入？？
         Field[] fields = bean.getClass().getDeclaredFields();
         for (Field field : fields) {
             boolean isExist = field.isAnnotationPresent(Reference.class);

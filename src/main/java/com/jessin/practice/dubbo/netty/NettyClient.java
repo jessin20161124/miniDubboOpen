@@ -1,6 +1,5 @@
 package com.jessin.practice.dubbo.netty;
 
-import com.alibaba.fastjson.JSON;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -29,6 +28,7 @@ public class NettyClient {
 
     private Channel socketChannel;
 
+    // todo 是否可以多个client共享
     private NettyClientHandler clientHandler = new NettyClientHandler();
 
     public NettyClient(String ipAndPort) {
@@ -76,9 +76,8 @@ public class NettyClient {
      * @param msg
      */
     public void send(Object msg) {
-        // TODO 必须用writeAndFlush才会真正发出去，同时必须序列化为字符串，才能被编码继续往下走
-        String jsonStr = JSON.toJSONString(msg);
-        socketChannel.writeAndFlush(jsonStr);
+        // TODO 必须用writeAndFlush才会真正发出去
+        socketChannel.writeAndFlush(msg);
     }
 
     public void close() {

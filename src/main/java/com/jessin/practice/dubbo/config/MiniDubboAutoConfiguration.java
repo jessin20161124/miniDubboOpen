@@ -27,9 +27,6 @@ import org.springframework.core.env.Environment;
 @Slf4j
 public class MiniDubboAutoConfiguration {
 
-    static {
-        FastJsonConfig.config();
-    }
     /**
      * 由于BeanFactoryPostProcessor是提前获取的，这个时候CommonAnnotationBeanPostProcessor还没注册到beanFactory中，
      * serviceBeanPostProcessor注入的属性为空

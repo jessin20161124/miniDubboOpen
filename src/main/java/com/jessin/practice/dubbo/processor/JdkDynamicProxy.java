@@ -1,6 +1,5 @@
 package com.jessin.practice.dubbo.processor;
 
-import com.alibaba.fastjson.JSONObject;
 import com.jessin.practice.dubbo.config.InterfaceConfig;
 import com.jessin.practice.dubbo.config.MiniDubboProperties;
 import com.jessin.practice.dubbo.invoker.FailfastClusterInvoker;
@@ -59,20 +58,21 @@ public class JdkDynamicProxy<T> implements InvocationHandler {
         // todo group，attachment
         RpcInvocation rpcInvocation = new RpcInvocation();
         rpcInvocation.setInterfaceName(clazzName);
+        rpcInvocation.setMethod(method);
         rpcInvocation.setParameterType(method.getParameterTypes());
         rpcInvocation.setArgs(args);
         rpcInvocation.setMethodName(method.getName());
         rpcInvocation.setVersion(interfaceConfig.getVersion());
         Class returnType = method.getReturnType();
 
+        // todo 如果本地与实现类，且版本、group均匹配的话，直接调用本地的
         log.info("jdk调用：{}，代理类为：{}，返回类型：{}", rpcInvocation, proxy, returnType);
         // todo 通过接口配置决定用哪种策略
         Response response = (Response)failfastClusterInvoker.invoke(rpcInvocation);
         if (returnType == Void.class) {
             return null;
         }
-        JSONObject jsonObject = (JSONObject)response.getResult();
-        return jsonObject.toJavaObject(returnType);
+        return response.getResult();
     }
 }
 

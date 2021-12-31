@@ -10,5 +10,8 @@ import lombok.Data;
 public class Response {
     private long id;
     private boolean isException;
+    /**
+     * todo dubbo中存的是RpcResult，里面有exception/result
+     */
     private Object result;
 }

@@ -19,7 +19,7 @@ public class FailfastClusterInvoker {
 
     /**
      * 这里从RegistryDirectory获取invoker列表，选择一台进行调用，底层调用netty连接 抽取接口
-     * todo 负载均衡算法，随机/轮询/加权
+     * todo 负载均衡算法，随机/轮询/加权，路由实现
      */
     public Object invoke(RpcInvocation rpcInvocation) {
         List<DubboInvoker> dubboInvokerList = registryDirectory.getInvokerList();

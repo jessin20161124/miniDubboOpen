@@ -50,6 +50,7 @@ public class DubboInvoker {
     }
 
     public void destroy() {
+        // todo 引用计数移除
         NettyClient nettyClient = NettyManager.removeNettyClient(ipAndPort);
         if (nettyClient != null) {
             nettyClient.close();
