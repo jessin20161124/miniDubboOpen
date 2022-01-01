@@ -33,7 +33,7 @@ public class ReferenceBeanPostProcessor extends InstantiationAwareBeanPostProces
                         throw new RuntimeException("dubbo依赖不是接口：" + field.getType().getName());
                     }
                     Reference  ref = field.getAnnotation(Reference.class);
-                    log.info("尝试注入接口代理，bean的{}属性为：{}", beanName, ref);
+                    log.info("尝试注入接口代理，bean:{} 属性为：{}", beanName, field.getName());
                     // 私有属性，必须设置为可访问
                     field.setAccessible(true);
                     field.set(bean, JdkDynamicProxy.createProxy(field.getType(), transform(ref), miniDubboProperties));

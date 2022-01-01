@@ -10,7 +10,7 @@ import com.jessin.practice.dubbo.registry.RegistryManager;
 import com.jessin.practice.dubbo.utils.NetUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 
 /**
  * todo 与spring 解耦
@@ -18,7 +18,7 @@ import org.springframework.beans.factory.InitializingBean;
  * @Date: 19-11-27 下午10:31
  */
 @Slf4j
-public class ServiceBean implements InitializingBean, DisposableBean {
+public class ServiceBean implements SmartInitializingSingleton, DisposableBean {
 
     private NettyServer nettyServer;
     /**
@@ -57,20 +57,23 @@ public class ServiceBean implements InitializingBean, DisposableBean {
     }
 
     /**
-     * todo 在这个阶段注册zk有问题，可能导致流量过早过来，需要迁移到容器启动后再注册
-     * @throws Exception
+     * 在InitializingBean.afterPropertiesSet阶段注册zk有问题，可能导致流量过早过来，但是其他bean还未初始化
+     * 这里到迁移到容器启动后，所有单例都初始化完毕后再注册，
+     * SmartInitializingSingleton.afterSingletonsInstantiated
+     * 或者监听ContextRefreshedEvent
+     *
      */
     @Override
-    public void afterPropertiesSet() throws Exception {
+    public void afterSingletonsInstantiated() {
         Class[] interfaces = ref.getClass().getInterfaces();
         if (interfaces.length <= 0) {
             throw new IllegalStateException(ref.getClass().getName() + "未实现接口");
         }
         // todo 目前只能实现一个接口
         String clazzName = interfaces[0].getName();
-        log.info("曝光key：{}，ref：{}", clazzName, ref);
-        // 暴露服务 todo 版本
-        DubboExporter.exportService(clazzName, ref);
+        log.info("spring所有单例都初始化完毕，曝光key：{}，ref：{}", clazzName, ref);
+        // 暴露服务  版本
+        DubboExporter.exportService(clazzName, interfaceConfig, ref);
         // 先开启，再注册
         // 判断协议
         if ("dubbo".equals(miniDubboProperties.getProtocol())) {

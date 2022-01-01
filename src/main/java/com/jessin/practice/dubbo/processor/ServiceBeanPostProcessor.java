@@ -37,7 +37,7 @@ public class ServiceBeanPostProcessor implements BeanDefinitionRegistryPostProce
     public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
         ClassPathBeanDefinitionScanner classPathBeanDefinitionScanner = new ClassPathBeanDefinitionScanner(registry, false);
         classPathBeanDefinitionScanner.addIncludeFilter(new AnnotationTypeFilter(Service.class));
-        // 将该包下的@Service注解全部扫描为bean
+        // 找到该包下的@Service注解全部扫描为BeanDefinition
         Set<BeanDefinition> beanDefinitionSet
                 = classPathBeanDefinitionScanner.findCandidateComponents(miniDubboProperties.getPackagePath());
         for (BeanDefinition beanDefinition : beanDefinitionSet) {

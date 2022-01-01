@@ -76,7 +76,7 @@ public class NettyClient {
      * @param msg
      */
     public void send(Object msg) {
-        // TODO 必须用writeAndFlush才会真正发出去
+        // 必须用writeAndFlush才会真正发出去
         socketChannel.writeAndFlush(msg);
     }
 
