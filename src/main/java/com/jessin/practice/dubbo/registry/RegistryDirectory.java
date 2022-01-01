@@ -17,18 +17,18 @@ import lombok.extern.slf4j.Slf4j;
  * @Date: 19-11-25 下午10:34
  */
 @Slf4j
-public class RegistryDirectory {
+public class RegistryDirectory implements ChildListener {
 
     private Map<String, DubboInvoker> ipAndPort2InvokerMap = new ConcurrentHashMap<>();
 
-    private CuratorZookeeperClient curatorZookeeperClient;
+    private RegistryService registryService;
 
     private InterfaceConfig interfaceConfig;
 
     private String providerPath;
 
     /**
-     * TODO 创建zk连接，监听zk路径创建DubboInvoker
+     * 创建zk连接，监听zk路径创建DubboInvoker
      * @param path
      */
     public RegistryDirectory(String path, String registry, InterfaceConfig interfaceConfig) {
@@ -36,23 +36,19 @@ public class RegistryDirectory {
         // 监听group/接口名/providers，有变化时通知RegistryDirectory，也就是调用notify(url, listener, urls);
         this.providerPath = "/miniDubbo/" + interfaceConfig.getGroup() + "/" + path + "/providers";
 
-        // TODO 创建zk连接，并创建RegistryDirectory，第一次时创建DubboInvoker
-        // 判断zk/redis。
-        curatorZookeeperClient = RegistryManager.getCuratorZookeeperClient(registry);
-        // todo 抽取subscribe方法
-        List<String> children = curatorZookeeperClient.addTargetChildListener(providerPath, new ChildListener() {
-                    @Override
-                    public void childChanged(String path, List<String> children) {
-                        log.info("监听到zk路径变化:{}，children:{}", path, children);
-                        processChildren(children);
-                    }
-                });
-
-        processChildren(children);
+        // 判断zk/redis。创建zk连接，并创建RegistryDirectory，第一次时创建DubboInvoker
+        registryService = RegistryManager.getRegistryService(registry);
+        registryService.subscribe(providerPath, this);
     }
 
-
-    public void processChildren(List<String> children) {
+    /**
+     * 注意，这里需要try/catch，否则抛异常后不会再有通知
+     * @param path
+     * @param children
+     */
+    @Override
+    public synchronized void childChanged(String path, List<String> children) {
+        log.info("监听到zk路径变化:{}，children:{}", path, children);
         try {
             if (children == null || children.size() == 0) {
                 // 可能是远程抖动，或者zookeeper出问题了，造成所有服务实例下线，这里还需要通过心跳检测。
@@ -80,7 +76,6 @@ public class RegistryDirectory {
         } catch (Exception e) {
             log.error("处理zk事件出错", e);
         }
-
     }
 
     public List<DubboInvoker> getInvokerList() {

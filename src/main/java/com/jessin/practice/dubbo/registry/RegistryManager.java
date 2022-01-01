@@ -1,7 +1,7 @@
 package com.jessin.practice.dubbo.registry;
 
-import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @Author: jessin
@@ -9,14 +9,19 @@ import java.util.Map;
  */
 public class RegistryManager {
 
-    private static Map<String, CuratorZookeeperClient> map = Maps.newHashMap();
-    public static CuratorZookeeperClient getCuratorZookeeperClient(String registry) {
-        if (map.containsKey(registry)) {
-            return map.get(registry);
+    private static Map<String, RegistryService> map = new ConcurrentHashMap<>();
+    public static RegistryService getRegistryService(String registryAddress) {
+        // 双检锁，任何对象都可以作为锁
+        if (map.containsKey(registryAddress)) {
+            return map.get(registryAddress);
         }
-        CuratorZookeeperClient curatorZookeeperClient = new CuratorZookeeperClient(registry);
-        map.put(registry, curatorZookeeperClient);
-        return curatorZookeeperClient;
+        synchronized (map) {
+            if (map.containsKey(registryAddress)) {
+                return map.get(registryAddress);
+            }
+            RegistryService registryService = new ZookeeperRegistryService(registryAddress);
+            map.put(registryAddress, registryService);
+            return registryService;
+        }
     }
-
 }

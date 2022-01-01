@@ -5,8 +5,8 @@ import com.jessin.practice.dubbo.config.MiniDubboProperties;
 import com.jessin.practice.dubbo.exporter.DubboExporter;
 import com.jessin.practice.dubbo.netty.NettyManager;
 import com.jessin.practice.dubbo.netty.NettyServer;
-import com.jessin.practice.dubbo.registry.CuratorZookeeperClient;
 import com.jessin.practice.dubbo.registry.RegistryManager;
+import com.jessin.practice.dubbo.registry.RegistryService;
 import com.jessin.practice.dubbo.utils.NetUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
@@ -24,7 +24,7 @@ public class ServiceBean implements SmartInitializingSingleton, DisposableBean {
     /**
      * zk地址
      */
-    private CuratorZookeeperClient curatorZookeeperClient;
+    private RegistryService registryService;
 
     private Object ref;
 
@@ -83,17 +83,18 @@ public class ServiceBean implements SmartInitializingSingleton, DisposableBean {
             throw new RuntimeException("unknown communicate protocol:" + miniDubboProperties.getProtocol());
         }
         // 判断什么类型的注册中心
-        curatorZookeeperClient = RegistryManager.getCuratorZookeeperClient(miniDubboProperties.getRegistry());
+        registryService = RegistryManager.getRegistryService(miniDubboProperties.getRegistry());
         // 原生dubbo是个url
         String providerPath = "/miniDubbo/" + interfaceConfig.getGroup() + "/" + clazzName + "/providers" + "/" + NetUtils.getServerIp() + ":" + miniDubboProperties.getPort();
 
-        // 注册zk，提炼register方法
-        curatorZookeeperClient.create(providerPath, true);
+        // 注册zk
+        registryService.register(providerPath);
     }
 
     @Override
     public void destroy() throws Exception {
-        curatorZookeeperClient.doClose();
+        // todo 引用计数销毁 统统使用RegistryManager.getRegistryService管理
+        registryService.close();
         nettyServer.close();
     }
 }

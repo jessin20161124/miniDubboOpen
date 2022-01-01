@@ -1,5 +1,16 @@
 package com.jessin.practice.dubbo.registry;
 
+import com.google.common.collect.Maps;
+import java.nio.charset.Charset;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import javafx.util.Pair;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -14,13 +25,6 @@ import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.WatchedEvent;
 
-import java.nio.charset.Charset;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-
 /**
  * @Author: jessin
  * @Date: 19-11-26 下午10:00
@@ -32,17 +36,24 @@ public class CuratorZookeeperClient {
     private final CuratorFramework client;
     private Map<String, TreeCache> treeCacheMap = new ConcurrentHashMap<>();
 
+    private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private Map<String, Boolean> createPath = Maps.newConcurrentMap();
+    private Map<String, CuratorWatcherImpl> childListenerMap = Maps.newConcurrentMap();
+    private Map<String, Pair<CuratorWatcherImpl, Executor>> dataListenerMap = Maps.newConcurrentMap();
+
     /**
-     * TODO 设置zk临时节点的有效时间sessionTimeout
+     * 设置zk临时节点的有效时间sessionTimeout
      * @param zkAddress
      */
     public CuratorZookeeperClient(String zkAddress) {
         try {
             int timeout = 3000;
+            int retryTimeMillis = 1000;
             CuratorFrameworkFactory.Builder builder = CuratorFrameworkFactory.builder()
                     .connectString(zkAddress)
-                    .retryPolicy(new RetryNTimes(1, 1000))
-                    .connectionTimeoutMs(timeout).sessionTimeoutMs(5000);
+                    .retryPolicy(new RetryNTimes(1, retryTimeMillis))
+                    .connectionTimeoutMs(timeout)
+                    .sessionTimeoutMs(timeout);
             client = builder.build();
             client.getConnectionStateListenable().addListener(new ConnectionStateListener() {
                 @Override
@@ -52,11 +63,11 @@ public class CuratorZookeeperClient {
                      //   CuratorZookeeperClient.this.stateChanged(StateListener.DISCONNECTED);
                     } else if (state == ConnectionState.CONNECTED) {
                         log.info("zk连接成功");
-
                    //     CuratorZookeeperClient.this.stateChanged(StateListener.CONNECTED);
                     } else if (state == ConnectionState.RECONNECTED) {
                         log.info("zk重新连接");
-                        // TODO 重新连接时，这里需要重新注册关注的事件
+                        //  这里有状态，重新连接时，这里需要重新注册关注的事件
+                        recover();
                      //   CuratorZookeeperClient.this.stateChanged(StateListener.RECONNECTED);
                     }
                 }
@@ -67,16 +78,26 @@ public class CuratorZookeeperClient {
         }
     }
 
-    public void createPersistent(String path) {
-        try {
-            client.create().forPath(path);
-        } catch (KeeperException.NodeExistsException e) {
-        } catch (Exception e) {
-            throw new IllegalStateException(e.getMessage(), e);
-        }
+    private void recover() {
+        long delayRecoverMillis = 3000;
+        scheduledExecutorService.schedule(() -> {
+            try {
+                log.info("恢复zk现场");
+                createPath.forEach(this::create);
+                childListenerMap.forEach(this::addTargetChildListener);
+                dataListenerMap.forEach((path, pair) -> {
+                    addTargetDataListener(path, pair.getKey(), pair.getValue());
+                });
+            } catch (Exception e) {
+                log.error("恢复现场失败", e);
+            }
+        }, delayRecoverMillis, TimeUnit.MILLISECONDS);
     }
 
     public void create(String path, boolean ephemeral) {
+        log.info("向zk注册节点：{}，是否临时：{}", path, ephemeral);
+        // 重连时用于恢复现场
+        createPath.put(path, ephemeral);
         if (!ephemeral) {
             if (checkExists(path)) {
                 return;
@@ -94,10 +115,18 @@ public class CuratorZookeeperClient {
         }
     }
 
-    public void createEphemeral(String path) {
+    private void createEphemeral(String path) {
         try {
-            log.info("向zk注册临时节点：{}", path);
             client.create().withMode(CreateMode.EPHEMERAL).forPath(path);
+        } catch (KeeperException.NodeExistsException e) {
+        } catch (Exception e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
+    }
+
+    private void createPersistent(String path) {
+        try {
+            client.create().forPath(path);
         } catch (KeeperException.NodeExistsException e) {
         } catch (Exception e) {
             throw new IllegalStateException(e.getMessage(), e);
@@ -136,6 +165,7 @@ public class CuratorZookeeperClient {
 
     public void delete(String path) {
         try {
+            createPath.remove(path);
             client.delete().forPath(path);
         } catch (KeeperException.NoNodeException e) {
         } catch (Exception e) {
@@ -183,23 +213,42 @@ public class CuratorZookeeperClient {
         client.close();
     }
 
-    public CuratorZookeeperClient.CuratorWatcherImpl createTargetChildListener(String path, ChildListener listener) {
-        return new CuratorZookeeperClient.CuratorWatcherImpl(client, listener);
-    }
-
+    /**
+     * 子节点变化操作
+     * @param path
+     * @param listener
+     * @return
+     */
     public List<String> addTargetChildListener(String path, ChildListener listener) {
         return addTargetChildListener(path, createTargetChildListener(path, listener));
     }
 
+    public CuratorZookeeperClient.CuratorWatcherImpl createTargetChildListener(String path, ChildListener listener) {
+        return new CuratorWatcherImpl(client, listener);
+    }
+
     public List<String> addTargetChildListener(String path, CuratorWatcherImpl listener) {
         try {
-            return client.getChildren().usingWatcher(listener).forPath(path);
+            List<String> ret = client.getChildren().usingWatcher(listener).forPath(path);
+            childListenerMap.put(path, listener);
+            return ret;
         } catch (KeeperException.NoNodeException e) {
             return null;
         } catch (Exception e) {
             throw new IllegalStateException(e.getMessage(), e);
         }
     }
+    public void removeTargetChildListener(String path, CuratorWatcherImpl listener) {
+        listener.unwatch();
+        childListenerMap.remove(path);
+    }
+
+    /**
+     * 数据操作
+     * @param path
+     * @param listener
+     * @return
+     */
 
     protected CuratorZookeeperClient.CuratorWatcherImpl createTargetDataListener(String path, DataListener listener) {
         return new CuratorWatcherImpl(client, listener);
@@ -219,6 +268,7 @@ public class CuratorZookeeperClient {
             } else {
                 treeCache.getListenable().addListener(treeCacheListener, executor);
             }
+            dataListenerMap.put(path, new Pair<>(treeCacheListener, executor));
         } catch (Exception e) {
             throw new IllegalStateException("Add treeCache listener for path:" + path, e);
         }
@@ -230,10 +280,7 @@ public class CuratorZookeeperClient {
             treeCache.getListenable().removeListener(treeCacheListener);
         }
         treeCacheListener.dataListener = null;
-    }
-
-    public void removeTargetChildListener(String path, CuratorWatcherImpl listener) {
-        listener.unwatch();
+        dataListenerMap.remove(path);
     }
 
     static class CuratorWatcherImpl implements CuratorWatcher, TreeCacheListener {
@@ -272,15 +319,14 @@ public class CuratorZookeeperClient {
                         // if path is null, curator using watcher will throw NullPointerException.
                         // if client connect or disconnect to server, zookeeper will queue
                         // watched event(Watcher.Event.EventType.None, .., path = null).
-                        // TODO 再次添加watcher，该方法返回子路径？
-                        path != null && path.length() > 0
-                                ? client.getChildren().usingWatcher(this).forPath(path)
-                                : Collections.<String>emptyList());
+                        // 再次添加watcher，watcher需要重新添加，该方法返回子路径
+                        path != null && path.length() > 0 ?
+                                client.getChildren().usingWatcher(this).forPath(path) : Collections.<String>emptyList());
             }
         }
 
         /**
-         * TreeCacheListener
+         * TreeCacheListener，数据变化
          * @param client
          * @param event
          * @throws Exception
@@ -316,14 +362,5 @@ public class CuratorZookeeperClient {
                 dataListener.dataChanged(path, content, type);
             }
         }
-    }
-
-    /**
-     * just for unit test
-     *
-     * @return
-     */
-    CuratorFramework getClient() {
-        return client;
     }
 }

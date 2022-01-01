@@ -5,10 +5,11 @@
 - [x] 与spring boot集成
 - [x] 支持一个类多个版本实现
 - [x] 服务端优雅启动，防止流量过早进来，造成超时。在spring容器启动成功后，再注册到zk上。
+- [x] zk重新连接时，重新注册关注的事件，恢复现场。对于服务端是重新注册；对于客户端是重新订阅
+
 
 ### TODO LIST
 &nbsp;&nbsp;&nbsp;&nbsp;通用需求：
-- [ ] zk重新连接时，需要重新注册关注的事件，恢复现场。对于服务端是重新注册；对于客户端是重新订阅
 - [ ] shutdown hook。spring容器销毁时，关闭占用的资源，如netty client/netty server
 - [ ] 保活机制，netty超时重连，心跳断开重连，销毁dubbo invoker
 - [ ] zk抖动导致所有服务实例下线优化
@@ -25,7 +26,7 @@
 &nbsp;&nbsp;&nbsp;&nbsp;consumer功能：
 - [ ] netty client通过计数引用销毁资源
 - [ ] 服务负载均衡算法：随机/轮询/加权，服务同机房路由
-- [ ] 集群失败策略：failover/failsafe/failback
+- [ ] 集群失败策略：failover/failsafe/fallback
 
 &nbsp;&nbsp;&nbsp;&nbsp;控制台规划：
 - [ ] 服务展示和治理
