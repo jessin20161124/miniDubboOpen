@@ -3,7 +3,6 @@ package com.jessin.practice.dubbo.registry;
 import com.google.common.collect.Lists;
 import com.jessin.practice.dubbo.config.InterfaceConfig;
 import com.jessin.practice.dubbo.invoker.DubboInvoker;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -79,6 +78,13 @@ public class RegistryDirectory implements ChildListener {
     }
 
     public List<DubboInvoker> getInvokerList() {
-        return new ArrayList<>(ipAndPort2InvokerMap.values());
+        // 找出可用的，zk有子节点，不表示节点底层网络可连通，例如zk超时时间比较长，还没有检测到
+        return ipAndPort2InvokerMap.values().stream().filter(dubboInvoker -> {
+            boolean available = dubboInvoker.isAvailable();
+            if (!available) {
+                log.warn("zk上该节点存在，但是底层网络探测到已经断开：{}", dubboInvoker.getIpAndPort());
+            }
+            return available;
+        }).collect(Collectors.toList());
     }
 }

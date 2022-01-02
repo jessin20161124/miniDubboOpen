@@ -2,6 +2,7 @@ package com.jessin.practice.dubbo.registry;
 
 import com.google.common.collect.Maps;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +33,7 @@ import org.apache.zookeeper.WatchedEvent;
 @Slf4j
 public class CuratorZookeeperClient {
 
-    static final Charset charset = Charset.forName("UTF-8");
+    static final Charset charset = StandardCharsets.UTF_8;
     private final CuratorFramework client;
     private Map<String, TreeCache> treeCacheMap = new ConcurrentHashMap<>();
 
@@ -41,12 +42,9 @@ public class CuratorZookeeperClient {
     private Map<String, CuratorWatcherImpl> childListenerMap = Maps.newConcurrentMap();
     private Map<String, Pair<CuratorWatcherImpl, Executor>> dataListenerMap = Maps.newConcurrentMap();
 
-    /**
-     * 设置zk临时节点的有效时间sessionTimeout
-     * @param zkAddress
-     */
     public CuratorZookeeperClient(String zkAddress) {
         try {
+            // 设置zk临时节点的有效时间sessionTimeout，连接时间和会话超时时间是不一样的
             int timeout = 3000;
             int retryTimeMillis = 1000;
             CuratorFrameworkFactory.Builder builder = CuratorFrameworkFactory.builder()

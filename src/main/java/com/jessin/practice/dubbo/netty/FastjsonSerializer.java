@@ -86,22 +86,26 @@ public class FastjsonSerializer implements Serializer {
             T data = JSON.parseObject(realStr, target, parserConfig);
             if (target == Request.class) {
                 Request request = ((Request)data);
-                RpcInvocation rpcInvocation = request.getRpcInvocation();
-                Object obj = DubboExporter.getService(rpcInvocation);
-                if (obj != null) {
-                    Method method = obj.getClass().getMethod(rpcInvocation.getMethodName(), rpcInvocation.getParameterType());
-                    Object[] newArgs = convert(rpcInvocation.getArgs(), method.getParameterTypes(), method.getGenericParameterTypes());
-                    rpcInvocation.setArgs(newArgs);
+                if (!request.isEvent()) {
+                    RpcInvocation rpcInvocation = request.getRpcInvocation();
+                    Object obj = DubboExporter.getService(rpcInvocation);
+                    if (obj != null) {
+                        Method method = obj.getClass().getMethod(rpcInvocation.getMethodName(), rpcInvocation.getParameterType());
+                        Object[] newArgs = convert(rpcInvocation.getArgs(), method.getParameterTypes(), method.getGenericParameterTypes());
+                        rpcInvocation.setArgs(newArgs);
+                    }
                 }
             } else if (target == Response.class) {
                 Response response = ((Response)data);
-                DefaultFuture.getRequest(response.getId()).ifPresent(
-                        request -> {
-                            Method method = request.getRpcInvocation().getMethod();
-                            Object newResult = convert(response.getResult(), method.getReturnType(), method.getGenericReturnType());
-                            response.setResult(newResult);
-                        }
-                );
+                if (!response.isEvent()) {
+                    DefaultFuture.getRequest(response.getId()).ifPresent(
+                            request -> {
+                                Method method = request.getRpcInvocation().getMethod();
+                                Object newResult = convert(response.getResult(), method.getReturnType(), method.getGenericReturnType());
+                                response.setResult(newResult);
+                            }
+                    );
+                }
             }
             return data;
         } catch (Exception e) {

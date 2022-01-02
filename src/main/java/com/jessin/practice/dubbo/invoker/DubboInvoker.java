@@ -32,21 +32,28 @@ public class DubboInvoker {
     }
 
     /**
-     * 抽取接口，可以有http invoker
+     * todo 抽取接口，可以有http invoker，filter实现
+     * 接口名待从url获取，版本待从url获取，超时时间待从url获取
      * @param rpcInvocation
      * @return
      */
     public Object invoke(RpcInvocation rpcInvocation) {
         log.info("向服务：{}发起请求", ipAndPort);
         Request request = new Request();
-        // TODO 接口名待从url获取，版本待从url获取
         request.setRpcInvocation(rpcInvocation);
         nettyClient.send(request);
         DefaultFuture defaultFuture = new DefaultFuture(request);
 
         // 阻塞等待结果...
-        // TODO 超时时间待从url获取
         return defaultFuture.getResponse(Long.parseLong(interfaceConfig.getTimeout()));
+    }
+
+    public boolean isAvailable() {
+        return nettyClient.isConnected();
+    }
+
+    public String getIpAndPort() {
+        return ipAndPort;
     }
 
     public void destroy() {

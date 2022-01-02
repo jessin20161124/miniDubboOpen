@@ -24,7 +24,7 @@ public class FailfastClusterInvoker {
     public Object invoke(RpcInvocation rpcInvocation) {
         List<DubboInvoker> dubboInvokerList = registryDirectory.getInvokerList();
         if (dubboInvokerList.size() == 0) {
-            throw new RuntimeException("no porvider ");
+            throw new RuntimeException("no provider ");
         }
         return dubboInvokerList.get(0).invoke(rpcInvocation);
     }

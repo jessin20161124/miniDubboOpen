@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class RegistryManager {
 
-    private static Map<String, RegistryService> map = new ConcurrentHashMap<>();
+    private static final Map<String, RegistryService> map = new ConcurrentHashMap<>();
     public static RegistryService getRegistryService(String registryAddress) {
         // 双检锁，任何对象都可以作为锁
         if (map.containsKey(registryAddress)) {

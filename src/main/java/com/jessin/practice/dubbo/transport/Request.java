@@ -17,6 +17,8 @@ public class Request {
      */
     private long id = idGenerator.incrementAndGet();
 
+    private boolean isEvent;
+
     /**
      * 数据
      */

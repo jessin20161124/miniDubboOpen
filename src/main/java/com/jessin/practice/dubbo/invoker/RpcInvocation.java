@@ -3,11 +3,6 @@ package com.jessin.practice.dubbo.invoker;
 import java.lang.reflect.Method;
 import lombok.Data;
 
-/**
- * TODO 是否需要序列化
- * @Author: jessin
- * @Date: 19-11-25 下午10:11
- */
 @Data
 public class RpcInvocation {
 

@@ -8,6 +8,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.timeout.IdleStateHandler;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -43,6 +45,8 @@ public class NettyServer {
                             ch.pipeline()
                                     .addLast(new BaseDecoder())
                                     .addLast(new BaseEncoder())
+                                    // 空闲触发器，服务端需要是客户端的2倍或以上，复用netty io线程，容易受到影响，可以单独搞个线程池
+                                    .addLast(new IdleStateHandler(Constants.HEARTBEAT_TIMEOUT_MILLIS, 0, 0, TimeUnit.MILLISECONDS))
                                     .addLast(serverHandler);
                         }
                     });
@@ -56,6 +60,7 @@ public class NettyServer {
             throw new RuntimeException("bind port error:" + port, e);
         }
     }
+
 
     /**
      * todo 关闭时调用，客户端也得关闭
