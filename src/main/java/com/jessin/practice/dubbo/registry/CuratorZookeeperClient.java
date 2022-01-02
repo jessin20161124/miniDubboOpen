@@ -11,7 +11,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import javafx.util.Pair;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -40,7 +39,7 @@ public class CuratorZookeeperClient {
     private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     private Map<String, Boolean> createPath = Maps.newConcurrentMap();
     private Map<String, CuratorWatcherImpl> childListenerMap = Maps.newConcurrentMap();
-    private Map<String, Pair<CuratorWatcherImpl, Executor>> dataListenerMap = Maps.newConcurrentMap();
+    private Map<String, Pair> dataListenerMap = Maps.newConcurrentMap();
 
     public CuratorZookeeperClient(String zkAddress) {
         try {
@@ -84,7 +83,7 @@ public class CuratorZookeeperClient {
                 createPath.forEach(this::create);
                 childListenerMap.forEach(this::addTargetChildListener);
                 dataListenerMap.forEach((path, pair) -> {
-                    addTargetDataListener(path, pair.getKey(), pair.getValue());
+                    addTargetDataListener(path, pair.getCuratorWatcher(), pair.getExecutor());
                 });
             } catch (Exception e) {
                 log.error("恢复现场失败", e);
@@ -266,7 +265,7 @@ public class CuratorZookeeperClient {
             } else {
                 treeCache.getListenable().addListener(treeCacheListener, executor);
             }
-            dataListenerMap.put(path, new Pair<>(treeCacheListener, executor));
+            dataListenerMap.put(path, new Pair(treeCacheListener, executor));
         } catch (Exception e) {
             throw new IllegalStateException("Add treeCache listener for path:" + path, e);
         }
@@ -359,6 +358,31 @@ public class CuratorZookeeperClient {
                 }
                 dataListener.dataChanged(path, content, type);
             }
+        }
+    }
+    static class Pair {
+        private CuratorWatcherImpl curatorWatcher;
+        private Executor executor;
+
+        public Pair(CuratorWatcherImpl curatorWatcher, Executor executor) {
+            this.curatorWatcher = curatorWatcher;
+            this.executor = executor;
+        }
+
+        public CuratorWatcherImpl getCuratorWatcher() {
+            return curatorWatcher;
+        }
+
+        public void setCuratorWatcher(CuratorWatcherImpl curatorWatcher) {
+            this.curatorWatcher = curatorWatcher;
+        }
+
+        public Executor getExecutor() {
+            return executor;
+        }
+
+        public void setExecutor(Executor executor) {
+            this.executor = executor;
         }
     }
 }
