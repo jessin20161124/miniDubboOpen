@@ -5,7 +5,6 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.parser.ParserConfig;
 import com.alibaba.fastjson.serializer.SerializerFeature;
-import com.google.common.base.Charsets;
 import com.jessin.practice.dubbo.exporter.DubboExporter;
 import com.jessin.practice.dubbo.invoker.RpcInvocation;
 import com.jessin.practice.dubbo.transport.DefaultFuture;
@@ -18,6 +17,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -28,12 +28,13 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * todo protocol buf，序列化需要实现跨语言，例如jdk序列化不支持跨语言
+ * todo protobuf，序列化需要实现跨语言，例如jdk序列化不支持跨语言
  * https://blog.csdn.net/fly910905/article/details/81504388
  * 对于调用服务端异常时，会返回异常栈，需要开启自动化类型支持，否则反序列化会报错，需要注意
  * @Author: jessin
@@ -59,7 +60,7 @@ public class FastjsonSerializer implements Serializer {
             // 例如Map<String, UserParam>，则value也会带上UserParam信息，可以反序列化成功
             String jsonStr = JSON.toJSONString(msg, SerializerFeature.WriteClassName);
 //            String jsonStr = JSON.toJSONString(msg);
-            byte[] wordBytes = jsonStr.getBytes(Charsets.UTF_8.name());
+            byte[] wordBytes = jsonStr.getBytes(StandardCharsets.UTF_8.name());
             return wordBytes;
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException("serial error", e);
@@ -70,7 +71,7 @@ public class FastjsonSerializer implements Serializer {
      * 由于fastjson在开启autoType功能时，仍然有部分未带@type 类型信息的情况，例如List<User>，这里需要依据本地方法进行反序列化
      *   可以利用接收方方法信息反射重建，通过本地方法的返回类型进行反序列化
      *    Response.result字段为JSONObject。
-     *    返回list/map/int,A<V>，带复杂key/value的是否有问题，应该是有问题的，因为msg丢失了类型信息，返回值也直接得到了信息，不需要反序列化了
+     *    返回list/map/int,A<V>，返回值也直接得到了信息，不需要反序列化了
      *
      *
      * @param realData
@@ -81,7 +82,7 @@ public class FastjsonSerializer implements Serializer {
     @Override
     public <T> T deserialize(byte[] realData, Class<T> target) {
         try {
-            String realStr = new String(realData, Charsets.UTF_8.name());
+            String realStr = new String(realData, StandardCharsets.UTF_8.name());
             // 反序列化时，支持识别传递的类，保证有泛型信息时也能成功，例如Map<String, UserParam>，则value的类型是UserParam，而不是JSONObject
             T data = JSON.parseObject(realStr, target, parserConfig);
             if (target == Request.class) {
@@ -101,8 +102,24 @@ public class FastjsonSerializer implements Serializer {
                     DefaultFuture.getRequest(response.getId()).ifPresent(
                             request -> {
                                 Method method = request.getRpcInvocation().getMethod();
-                                Object newResult = convert(response.getResult(), method.getReturnType(), method.getGenericReturnType());
-                                response.setResult(newResult);
+                                // todo CompletableFuture这里跟序列化无关，需要提到外层
+                                // 对于返回future类型，服务端返回的是具体的值，这里客户端需要特殊处理下
+                                if (CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
+                                    Type genericType = method.getGenericReturnType();
+                                    Type valueType = getGenericClassByIndex(genericType, 0);
+                                    // CompletableFuture<ValueType>
+                                    Object newResult;
+                                    if (valueType != null) {
+                                        newResult = convert(response.getResult(), null, valueType);
+                                    } else {
+                                        // 没有泛型信息，不做处理，依赖@type实现反序列化正确
+                                        newResult = response.getResult();
+                                    }
+                                    response.setResult(newResult);
+                                } else {
+                                    Object newResult = convert(response.getResult(), method.getReturnType(), method.getGenericReturnType());
+                                    response.setResult(newResult);
+                                }
                             }
                     );
                 }

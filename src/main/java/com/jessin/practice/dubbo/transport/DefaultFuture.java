@@ -1,9 +1,13 @@
 package com.jessin.practice.dubbo.transport;
 
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -13,19 +17,46 @@ import java.util.concurrent.TimeUnit;
  * @Date: 19-11-25 下午10:44
  */
 public class DefaultFuture {
-    private static Map<Long, DefaultFuture> id2FutureMap = new ConcurrentHashMap<>();
-    private static Map<Long, Request> id2RequestMap = new ConcurrentHashMap<>();
 
+    private static final RuntimeException TIMEOUT_EXCEPTION = new RuntimeException("超时了");
+
+    private static Map<Long, DefaultFuture> id2FutureMap = new ConcurrentHashMap<>();
+
+    private static ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
     private CountDownLatch countDownLatch = new CountDownLatch(1);
 
+    private long timeout;
+
     private volatile Response response;
 
-    public DefaultFuture(Request request) {
+    private Request request;
+
+    private List<Callback> callbackList = Lists.newArrayList();
+
+    public DefaultFuture(Request request, long timeout) {
+        this.request = request;
+        this.timeout = timeout;
         id2FutureMap.put(request.getId(), this);
-        id2RequestMap.put(request.getId(), request);
+        // 如果没有收到响应，应该设置超时移除。不然map会无限扩大
+        scheduledExecutorService.schedule(() -> {
+            Response response = new Response();
+            response.setId(request.getId());
+            response.setException(true);
+            response.setResult(TIMEOUT_EXCEPTION);
+            setResponse(response);
+        }, timeout, TimeUnit.MILLISECONDS);
     }
 
+    public Request getRequest() {
+        return request;
+    }
+
+    /**
+     * 因为netty是异步的，这里需要循环等待服务端返回数据，业务线程等待netty io线程设置
+     * @param waitMillis
+     * @return
+     */
     public Response getResponse(long waitMillis) {
         long start = System.currentTimeMillis();
         while (response == null) {
@@ -36,7 +67,7 @@ public class DefaultFuture {
                 e.printStackTrace();
             }
             if (System.currentTimeMillis() - start > waitMillis) {
-                throw new RuntimeException("超时了");
+                throw TIMEOUT_EXCEPTION;
             }
         }
         if (response.getResult() instanceof Exception) {
@@ -47,27 +78,47 @@ public class DefaultFuture {
 
     /**
      * 只能通过下面静态方法修改
-     * @param resonse
+     * @param response
      */
-    private void setInnerResponse(Response resonse) {
-        this.response = resonse;
+    private void setInnerResponse(Response response) {
+        this.response = response;
         countDownLatch.countDown();
+        callbackList.forEach((callback -> {
+            if (response.isException()) {
+                callback.finish(null, (Exception)response.getResult());
+            } else {
+                callback.finish(response.getResult(), null);
+            }
+        }));
     }
 
     /**
-     * todo 需要在receive时将该id对应的entry移除，同时如果没有收到响应，应该设置超时移除。。不然map会无限扩大。
-     * todo 支持cancel
+     * 需要在receive时将该id对应的entry移除
      * @param response
      */
     public static void setResponse(Response response) {
-        DefaultFuture defaultFuture = id2FutureMap.get(response.getId());
+        DefaultFuture defaultFuture = id2FutureMap.remove(response.getId());
         if (defaultFuture != null) {
             defaultFuture.setInnerResponse(response);
         }
     }
 
     public static Optional<Request> getRequest(long id) {
-        Request request = id2RequestMap.get(id);
-        return Optional.ofNullable(request);
+        DefaultFuture defaultFuture = id2FutureMap.get(id);
+        return defaultFuture != null ? Optional.ofNullable(defaultFuture.getRequest()) : Optional.empty();
+    }
+
+    public void addCallback(Callback callback) {
+        callbackList.add(callback);
+    }
+
+    public interface Callback {
+
+        /**
+         * 当有结果时，调用这个回调函数
+         * @param result
+         * @param exception
+         */
+        void finish(Object result, Exception exception);
     }
 }

@@ -5,6 +5,8 @@ import com.jessin.practice.dubbo.netty.NettyClient;
 import com.jessin.practice.dubbo.netty.NettyManager;
 import com.jessin.practice.dubbo.transport.DefaultFuture;
 import com.jessin.practice.dubbo.transport.Request;
+import com.jessin.practice.dubbo.transport.Response;
+import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -42,10 +44,28 @@ public class DubboInvoker {
         Request request = new Request();
         request.setRpcInvocation(rpcInvocation);
         nettyClient.send(request);
-        DefaultFuture defaultFuture = new DefaultFuture(request);
+        long timeout = Long.parseLong(interfaceConfig.getTimeout());
+        DefaultFuture defaultFuture = new DefaultFuture(request, timeout);
 
-        // 阻塞等待结果...
-        return defaultFuture.getResponse(Long.parseLong(interfaceConfig.getTimeout()));
+        // 客户端返回一个假的CompletableFuture，当DefaultFuture有值时再传递过去，要求服务端只传递值，而不是CompletableFuture
+        if (CompletableFuture.class.isAssignableFrom(rpcInvocation.getMethod().getReturnType())) {
+            // 返回结果泛型类型由序列化保证，在序列化时，需要带上该实例的类型，然后在客户端反序列化才能成功
+            CompletableFuture ret = new CompletableFuture();
+            defaultFuture.addCallback((result, exception) -> {
+                if (exception != null) {
+                    ret.completeExceptionally(exception);
+                } else {
+                    ret.complete(result);
+                }
+            });
+            // todo 外层是response，所以这里需要适配下
+            Response response = new Response();
+            response.setId(request.getId());
+            response.setResult(ret);
+            return response;
+        }
+        // 阻塞等待结果
+        return defaultFuture.getResponse(timeout);
     }
 
     public boolean isAvailable() {

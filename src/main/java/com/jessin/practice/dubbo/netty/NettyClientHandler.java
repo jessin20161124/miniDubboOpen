@@ -43,6 +43,7 @@ public class NettyClientHandler extends ChannelDuplexHandler {
             return;
         }
         log.info("收到服务端消息：{}", msg);
+        // 底层有callback的话，可能也需要线程池
         DefaultFuture.setResponse(response);
     }
 

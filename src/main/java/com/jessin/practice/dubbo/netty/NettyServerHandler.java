@@ -34,6 +34,7 @@ public class NettyServerHandler extends ChannelDuplexHandler {
     private ExecutorService executorService = new ThreadPoolExecutor(10, 10, 1, TimeUnit.MINUTES,
             new LinkedBlockingDeque<>(100), new ThreadFactory() {
         AtomicInteger id = new AtomicInteger();
+
         @Override
         public Thread newThread(Runnable r) {
             String threadName = "miniDubbo_server_biz_thread_" + id.incrementAndGet();
@@ -58,7 +59,7 @@ public class NettyServerHandler extends ChannelDuplexHandler {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         // 已经解码了
-        Request request = (Request)msg;
+        Request request = (Request) msg;
         Response response = new Response();
         response.setId(request.getId());
         if (request.isEvent()) {
@@ -76,27 +77,43 @@ public class NettyServerHandler extends ChannelDuplexHandler {
     }
 
     private void processBizRequest(ChannelHandlerContext ctx, Object msg) {
-        Request request = (Request)msg;
+        Request request = (Request) msg;
         Response response = new Response();
         response.setId(request.getId());
         log.info("收到请求消息：{}", msg);
         RpcInvocation rpcInvocation = request.getRpcInvocation();
         Object obj = DubboExporter.getService(rpcInvocation);
+        if (obj == null) {
+            response.setException(true);
+            response.setResult(new RuntimeException("no provider"));
+            // 通过原来客户端通道发送出去，这里会走编码
+            ctx.writeAndFlush(response);
+            return;
+        }
         try {
-            if (obj == null) {
-                response.setException(true);
-                response.setResult(new RuntimeException("no provider"));
-            } else {
-                log.info("开始反射调用：{}", msg);
-                // 这里所有参数都是正确的，有泛化信息也是对的，由序列化层解决
-                Method method = obj.getClass().getMethod(rpcInvocation.getMethodName(), rpcInvocation.getParameterType());
-                log.info("入参：{}", rpcInvocation.getArgs());
-                // filter...
-                Object responseData = method.invoke(obj, rpcInvocation.getArgs());
-                response.setResult(responseData);
-                log.info("调用实例：{}，方法：{}，返回结果：{}",
-                        obj, method, response);
+            log.info("开始反射调用：{}", msg);
+            // 这里所有参数都是正确的，有泛化信息也是对的，由序列化层解决
+            Method method = obj.getClass().getMethod(rpcInvocation.getMethodName(), rpcInvocation.getParameterType());
+            log.info("入参：{}", rpcInvocation.getArgs());
+            // filter...
+            Object responseData = method.invoke(obj, rpcInvocation.getArgs());
+            if (responseData != null && CompletableFuture.class.isAssignableFrom(method.getReturnType())) {
+                // 服务端如果返回的是future类型，最终返回的是future具体的值
+                ((CompletableFuture) responseData).whenComplete((result, exception) -> {
+                    if (exception != null) {
+                        response.setResult(exception);
+                    } else {
+                        response.setResult(result);
+                    }
+                    // 通过原来客户端通道发送出去，这里会走编码
+                    ctx.writeAndFlush(response);
+                });
+                return;
             }
+            response.setResult(responseData);
+            log.info("调用实例：{}，方法：{}，返回结果：{}",
+                    obj, method, response);
+
         } catch (Exception e) {
             log.error("调用dubbo异常：{}", rpcInvocation, e);
             response.setException(true);
@@ -113,6 +130,7 @@ public class NettyServerHandler extends ChannelDuplexHandler {
 
     /**
      * 写回调
+     *
      * @param ctx
      * @param msg
      * @param promise
@@ -127,7 +145,6 @@ public class NettyServerHandler extends ChannelDuplexHandler {
     /**
      * 服务端检测到某个client channel空闲时，直接关闭。客户端会定时发起心跳，如果超过一定时间没有数据到达，
      * 说明客户端挂了或者网络有问题，需要关闭客户端
-     *
      *
      * @param ctx
      * @param evt
