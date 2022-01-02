@@ -72,6 +72,7 @@ public class NettyClientHandler extends ChannelDuplexHandler {
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
+            // 这里是否需要检测当前连接状态??
             log.info("客户端检测到通道空闲，发送心跳请求");
             // 当前通道空闲了
             Request request = new Request();

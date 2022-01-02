@@ -7,6 +7,7 @@
 - [x] 服务端优雅启动，防止流量过早进来，造成超时。在spring容器启动成功后，再注册到zk上。
 - [x] zk重新连接时，重新注册关注的事件，恢复现场。对于服务端是重新注册；对于客户端是重新订阅
 - [x] netty心跳保活机制，客户端超时断开重连，重连时dubbo invoker不可用，服务端超时关闭无效连接
+- [x] 服务端请求用线程池实现，避免阻塞NioEventLoop
 
 
 ### TODO LIST
@@ -20,7 +21,6 @@
 
 &nbsp;&nbsp;&nbsp;&nbsp;provider功能：
 - [ ] 服务端优雅下线。在spring容器销毁前(ContextClosedEvent)，先从zk取消注册，最后再关闭客户端连接。
-- [ ] 服务端请求用线程池实现，避免阻塞NioEventLoop
 - [ ] 服务端支持曝光实现多个接口的一个类
 
 &nbsp;&nbsp;&nbsp;&nbsp;consumer功能：

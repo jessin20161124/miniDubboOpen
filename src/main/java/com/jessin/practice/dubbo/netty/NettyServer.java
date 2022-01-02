@@ -21,7 +21,7 @@ public class NettyServer {
     // 底层会启动2*cpu个数的NioEventLoop，轮询注册到对应的NioEventLoop运行
     private EventLoopGroup boss = new NioEventLoopGroup();
     private EventLoopGroup worker = new NioEventLoopGroup();
-    // 全局复用，是否需要考虑可共享？
+    // 全局复用，可共享
     private NettyServerHandler serverHandler = new NettyServerHandler();
     private int port;
 

@@ -1,10 +1,5 @@
 package com.jessin.practice.dubbo.netty;
 
-/**
- * @Author: jessin
- * @Date: 2022/1/1 11:49 上午
- */
-
 import com.jessin.practice.dubbo.exporter.DubboExporter;
 import com.jessin.practice.dubbo.invoker.RpcInvocation;
 import com.jessin.practice.dubbo.transport.Request;
@@ -17,7 +12,14 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.timeout.IdleStateEvent;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -28,6 +30,16 @@ import lombok.extern.slf4j.Slf4j;
 public class NettyServerHandler extends ChannelDuplexHandler {
 
     private Map<Channel, Channel> clientChanel = new ConcurrentHashMap<>();
+
+    private ExecutorService executorService = new ThreadPoolExecutor(10, 10, 1, TimeUnit.MINUTES,
+            new LinkedBlockingDeque<>(100), new ThreadFactory() {
+        AtomicInteger id = new AtomicInteger();
+        @Override
+        public Thread newThread(Runnable r) {
+            String threadName = "miniDubbo_server_biz_thread_" + id.incrementAndGet();
+            return new Thread(r, threadName);
+        }
+    });
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -56,6 +68,17 @@ public class NettyServerHandler extends ChannelDuplexHandler {
             ctx.writeAndFlush(response);
             return;
         }
+        // 这里交给线程池处理，避免阻塞NioEventLoop
+        CompletableFuture.supplyAsync(() -> {
+            processBizRequest(ctx, msg);
+            return null;
+        }, executorService);
+    }
+
+    private void processBizRequest(ChannelHandlerContext ctx, Object msg) {
+        Request request = (Request)msg;
+        Response response = new Response();
+        response.setId(request.getId());
         log.info("收到请求消息：{}", msg);
         RpcInvocation rpcInvocation = request.getRpcInvocation();
         Object obj = DubboExporter.getService(rpcInvocation);
@@ -65,7 +88,6 @@ public class NettyServerHandler extends ChannelDuplexHandler {
                 response.setResult(new RuntimeException("no provider"));
             } else {
                 log.info("开始反射调用：{}", msg);
-                // todo 这里最好用线程池实现，不然会阻塞NioEventLoop
                 // 这里所有参数都是正确的，有泛化信息也是对的，由序列化层解决
                 Method method = obj.getClass().getMethod(rpcInvocation.getMethodName(), rpcInvocation.getParameterType());
                 log.info("入参：{}", rpcInvocation.getArgs());
