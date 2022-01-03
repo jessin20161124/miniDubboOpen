@@ -1,6 +1,7 @@
 package com.jessin.practice.dubbo.registry;
 
 import com.google.common.collect.Maps;
+import com.jessin.practice.dubbo.utils.Pair;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -39,7 +40,7 @@ public class CuratorZookeeperClient {
     private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     private Map<String, Boolean> createPath = Maps.newConcurrentMap();
     private Map<String, CuratorWatcherImpl> childListenerMap = Maps.newConcurrentMap();
-    private Map<String, Pair> dataListenerMap = Maps.newConcurrentMap();
+    private Map<String, Pair<CuratorWatcherImpl, Executor>> dataListenerMap = Maps.newConcurrentMap();
 
     public CuratorZookeeperClient(String zkAddress) {
         try {
@@ -83,7 +84,7 @@ public class CuratorZookeeperClient {
                 createPath.forEach(this::create);
                 childListenerMap.forEach(this::addTargetChildListener);
                 dataListenerMap.forEach((path, pair) -> {
-                    addTargetDataListener(path, pair.getCuratorWatcher(), pair.getExecutor());
+                    addTargetDataListener(path, pair.getLeft(), pair.getRight());
                 });
             } catch (Exception e) {
                 log.error("恢复现场失败", e);
@@ -162,6 +163,7 @@ public class CuratorZookeeperClient {
 
     public void delete(String path) {
         try {
+            log.info("删除zk路径：{}", path);
             createPath.remove(path);
             client.delete().forPath(path);
         } catch (KeeperException.NoNodeException e) {
@@ -207,6 +209,7 @@ public class CuratorZookeeperClient {
     }
 
     public void doClose() {
+        log.info("关闭zk");
         client.close();
     }
 
@@ -227,7 +230,11 @@ public class CuratorZookeeperClient {
     public List<String> addTargetChildListener(String path, CuratorWatcherImpl listener) {
         try {
             List<String> ret = client.getChildren().usingWatcher(listener).forPath(path);
+            // todo 一个path暂时只能注册一个child watcher
             childListenerMap.put(path, listener);
+            log.info("添加zk路径ChildListener：{}，得到子节点：{}", path, ret);
+            // 第一次需要手动调用，恢复现场也需要调用
+            listener.childListener.childChanged(path, ret);
             return ret;
         } catch (KeeperException.NoNodeException e) {
             return null;
@@ -235,9 +242,13 @@ public class CuratorZookeeperClient {
             throw new IllegalStateException(e.getMessage(), e);
         }
     }
-    public void removeTargetChildListener(String path, CuratorWatcherImpl listener) {
-        listener.unwatch();
-        childListenerMap.remove(path);
+
+    public void removeTargetChildListener(String path) {
+        CuratorWatcherImpl listener = childListenerMap.remove(path);
+        if (listener != null) {
+            log.info("删除zk路径ChildListener：{}", path);
+            listener.unwatch();
+        }
     }
 
     /**
@@ -358,31 +369,6 @@ public class CuratorZookeeperClient {
                 }
                 dataListener.dataChanged(path, content, type);
             }
-        }
-    }
-    static class Pair {
-        private CuratorWatcherImpl curatorWatcher;
-        private Executor executor;
-
-        public Pair(CuratorWatcherImpl curatorWatcher, Executor executor) {
-            this.curatorWatcher = curatorWatcher;
-            this.executor = executor;
-        }
-
-        public CuratorWatcherImpl getCuratorWatcher() {
-            return curatorWatcher;
-        }
-
-        public void setCuratorWatcher(CuratorWatcherImpl curatorWatcher) {
-            this.curatorWatcher = curatorWatcher;
-        }
-
-        public Executor getExecutor() {
-            return executor;
-        }
-
-        public void setExecutor(Executor executor) {
-            this.executor = executor;
         }
     }
 }

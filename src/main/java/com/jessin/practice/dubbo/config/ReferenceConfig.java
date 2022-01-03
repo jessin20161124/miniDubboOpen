@@ -1,7 +1,5 @@
-package com.jessin.practice.dubbo.processor;
+package com.jessin.practice.dubbo.config;
 
-import com.jessin.practice.dubbo.config.InterfaceConfig;
-import com.jessin.practice.dubbo.config.MiniDubboProperties;
 import com.jessin.practice.dubbo.invoker.FailfastClusterInvoker;
 import com.jessin.practice.dubbo.invoker.RpcInvocation;
 import com.jessin.practice.dubbo.registry.RegistryDirectory;
@@ -9,13 +7,16 @@ import com.jessin.practice.dubbo.transport.Response;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.extern.slf4j.Slf4j;
 /**
  * @Author: jessin
  * @Date: 19-11-25 下午9:54
  */
 @Slf4j
-public class JdkDynamicProxy<T> implements InvocationHandler {
+public class ReferenceConfig<T> implements InvocationHandler {
+
+    private AtomicBoolean destroyed = new AtomicBoolean();
 
     private String clazzName;
 
@@ -27,19 +28,22 @@ public class JdkDynamicProxy<T> implements InvocationHandler {
 
     private InterfaceConfig interfaceConfig;
 
-    private MiniDubboProperties miniDubboProperties;
+    private ApplicationConfig applicationConfig;
 
-    public JdkDynamicProxy(Class<T> clazz, InterfaceConfig interfaceConfig, MiniDubboProperties miniDubboProperties) {
+    public ReferenceConfig(Class<T> clazz, InterfaceConfig interfaceConfig, ApplicationConfig applicationConfig) {
         proxy = Proxy.newProxyInstance(this.getClass().getClassLoader(), new Class[]{clazz}, this);
         this.clazzName = clazz.getName();
-        registryDirectory = new RegistryDirectory(clazzName, miniDubboProperties.getRegistry(), interfaceConfig);
+        registryDirectory = new RegistryDirectory(clazzName, applicationConfig.getRegistry(), interfaceConfig);
         failfastClusterInvoker = new FailfastClusterInvoker(registryDirectory);
         this.interfaceConfig = interfaceConfig;
     }
 
+    public static <T>  Object createProxy(Class<T> clazz, InterfaceConfig interfaceConfig, ApplicationConfig applicationConfig) {
+        return new ReferenceConfig(clazz, interfaceConfig, applicationConfig).getProxy();
+    }
 
-    public static <T>  Object createProxy(Class<T> clazz, InterfaceConfig interfaceConfig, MiniDubboProperties miniDubboProperties) {
-        return new JdkDynamicProxy(clazz, interfaceConfig, miniDubboProperties).proxy;
+    public Object getProxy() {
+        return proxy;
     }
 
     /**
@@ -52,6 +56,11 @@ public class JdkDynamicProxy<T> implements InvocationHandler {
      */
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        // 销毁后不可用
+        if (destroyed.get()) {
+            throw new RuntimeException("RerferenceConfig已经被销毁，不可使用");
+        }
+
         if ("toString".equals(method.getName())) {
             return this.toString();
         }
@@ -73,6 +82,12 @@ public class JdkDynamicProxy<T> implements InvocationHandler {
             return null;
         }
         return response.getResult();
+    }
+
+    public void destroy() {
+        if (destroyed.compareAndSet(false, true)) {
+            registryDirectory.destroy();
+        }
     }
 }
 

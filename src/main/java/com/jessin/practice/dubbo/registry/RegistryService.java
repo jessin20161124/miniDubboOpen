@@ -14,6 +14,8 @@ public interface RegistryService extends Closeable {
      */
     void register(String providerPath);
 
+    void unregister(String providerPath);
+
     /**
      * 订阅prividerPath路径下的子节点变化，有变化时通过listener通知我
      * @param providerPath /miniDubbo/myGroup/com.jessin.practice.dubbo.service.DomainService/providers
@@ -21,5 +23,6 @@ public interface RegistryService extends Closeable {
      */
     void subscribe(String providerPath, ChildListener childListener);
 
+    void unsubscribe(String providerPath);
 
 }

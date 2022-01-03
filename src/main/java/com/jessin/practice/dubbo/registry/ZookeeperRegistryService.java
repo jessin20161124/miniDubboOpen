@@ -1,7 +1,6 @@
 package com.jessin.practice.dubbo.registry;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  * @Author: jessin
@@ -22,10 +21,19 @@ public class ZookeeperRegistryService implements RegistryService {
     }
 
     @Override
+    public void unregister(String providerPath) {
+        curatorZookeeperClient.delete(providerPath);
+    }
+
+    @Override
     public void subscribe(String providerPath, ChildListener childListener) {
-        List<String> children = curatorZookeeperClient.addTargetChildListener(providerPath, childListener);
-        // 第一次，需要手动通知
-        childListener.childChanged(providerPath, children);
+        // 添加watcher
+        curatorZookeeperClient.addTargetChildListener(providerPath, childListener);
+    }
+
+    @Override
+    public void unsubscribe(String providerPath) {
+        curatorZookeeperClient.removeTargetChildListener(providerPath);
     }
 
     @Override

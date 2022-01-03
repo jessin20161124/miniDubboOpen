@@ -18,6 +18,11 @@ public class DubboExporter {
         exportServiceMap.put(key, ref);
     }
 
+    public static void remove(String clazzName, InterfaceConfig interfaceConfig) {
+        String key = buildKey(clazzName, interfaceConfig.getVersion());
+        exportServiceMap.remove(key);
+    }
+
     public static Object getService(RpcInvocation rpcInvocation) {
         String key = buildKey(rpcInvocation.getInterfaceName(), rpcInvocation.getVersion());
         return exportServiceMap.get(key);

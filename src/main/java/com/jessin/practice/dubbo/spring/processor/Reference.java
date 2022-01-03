@@ -1,4 +1,4 @@
-package com.jessin.practice.dubbo.processor;
+package com.jessin.practice.dubbo.spring.processor;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

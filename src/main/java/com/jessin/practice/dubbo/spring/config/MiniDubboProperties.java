@@ -1,5 +1,6 @@
-package com.jessin.practice.dubbo.config;
+package com.jessin.practice.dubbo.spring.config;
 
+import com.jessin.practice.dubbo.config.ApplicationConfig;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -9,26 +10,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(MiniDubboProperties.PREFIX)
 @Data
-public class MiniDubboProperties {
+public class MiniDubboProperties extends ApplicationConfig {
     public static final String PREFIX = "mini-dubbo";
 
     public static final String PACKAGE_PATH = "package-path";
 
     private String packagePath;
-
-    /**
-     * 注册中心，实际可以有多个
-     */
-    private String registry = "127.0.0.1:2181";
-
-    /**
-     * 通信协议
-     */
-    private String protocol = "dubbo";
-    /**
-     * 通信端口
-     */
-    private Integer port = 20880;
 
     /**
      * server/client/both

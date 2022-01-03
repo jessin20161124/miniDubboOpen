@@ -13,7 +13,7 @@ public class RpcInvocation {
     private String methodName;
 
     /**
-     * 不序列化，内部使用
+     * 不序列化，consumer内部使用
      */
     private transient Method method;
     /**

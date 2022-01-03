@@ -10,8 +10,8 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- *  * 注册项目录，所有的dubboInvoker都保存到这里，实现zk listener，监听zk路径变化，当zk变化时，构造DubboInvoker。
- *  * 每个service应该有一个，同一个zk集群同一台机器应该只建立一个共享连接
+ * 注册项目录，每个service的所有的dubboInvoker都保存到这里，实现zk listener，监听zk路径变化，当zk变化时，构造DubboInvoker。
+ * 同一个zk集群同一台机器应该只建立一个共享连接
  * @Author: jessin
  * @Date: 19-11-25 下午10:34
  */
@@ -26,17 +26,20 @@ public class RegistryDirectory implements ChildListener {
 
     private String providerPath;
 
+    private String registryAddress;
+
     /**
      * 创建zk连接，监听zk路径创建DubboInvoker
      * @param path
      */
     public RegistryDirectory(String path, String registry, InterfaceConfig interfaceConfig) {
         this.interfaceConfig = interfaceConfig;
+        this.registryAddress = registry;
         // 监听group/接口名/providers，有变化时通知RegistryDirectory，也就是调用notify(url, listener, urls);
         this.providerPath = "/miniDubbo/" + interfaceConfig.getGroup() + "/" + path + "/providers";
 
         // 判断zk/redis。创建zk连接，并创建RegistryDirectory，第一次时创建DubboInvoker
-        registryService = RegistryManager.getRegistryService(registry);
+        registryService = RegistryManager.getRegistryService(registryAddress);
         registryService.subscribe(providerPath, this);
     }
 
@@ -69,6 +72,7 @@ public class RegistryDirectory implements ChildListener {
                 }
             });
             deleted.forEach(ipAndPort -> {
+                // 运行时删除
                 ipAndPort2InvokerMap.get(ipAndPort).destroy();
                 ipAndPort2InvokerMap.remove(ipAndPort);
             });
@@ -86,5 +90,20 @@ public class RegistryDirectory implements ChildListener {
             }
             return available;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * 销毁
+     */
+    public void destroy() {
+        // 先解除订阅，再销毁invoker
+        registryService.unsubscribe(providerPath);
+        // 减少引用，引用为0再关闭
+        RegistryManager.remove(registryAddress);
+
+        ipAndPort2InvokerMap.forEach((key, dubboInvoker) -> {
+            dubboInvoker.destroy();
+        });
+        ipAndPort2InvokerMap.clear();
     }
 }

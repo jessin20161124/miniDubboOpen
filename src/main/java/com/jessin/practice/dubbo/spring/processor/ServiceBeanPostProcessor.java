@@ -1,7 +1,7 @@
-package com.jessin.practice.dubbo.processor;
+package com.jessin.practice.dubbo.spring.processor;
 
 import com.jessin.practice.dubbo.config.InterfaceConfig;
-import com.jessin.practice.dubbo.config.MiniDubboProperties;
+import com.jessin.practice.dubbo.spring.config.MiniDubboProperties;
 import java.util.Set;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanClassLoaderAware;
@@ -45,7 +45,7 @@ public class ServiceBeanPostProcessor implements BeanDefinitionRegistryPostProce
             registry.registerBeanDefinition(beanName, beanDefinition);
             BeanDefinition wrapper = new RootBeanDefinition(ServiceBean.class);
             wrapper.getPropertyValues().addPropertyValue("ref", new RuntimeBeanReference(beanName));
-            wrapper.getPropertyValues().addPropertyValue("miniDubboProperties", miniDubboProperties);
+            wrapper.getPropertyValues().addPropertyValue("applicationConfig", miniDubboProperties);
             Class beanClass = ClassUtils.resolveClassName(beanDefinition.getBeanClassName(), classLoader);
             Service service = AnnotationUtils.findAnnotation(beanClass, Service.class);
             wrapper.getPropertyValues().addPropertyValue("interfaceConfig", transform(service));

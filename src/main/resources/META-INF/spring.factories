@@ -1,2 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.jessin.practice.dubbo.config.MiniDubboAutoConfiguration
+com.jessin.practice.dubbo.spring.config.MiniDubboAutoConfiguration

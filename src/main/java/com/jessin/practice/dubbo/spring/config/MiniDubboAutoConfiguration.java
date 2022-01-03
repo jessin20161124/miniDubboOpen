@@ -1,8 +1,8 @@
-package com.jessin.practice.dubbo.config;
+package com.jessin.practice.dubbo.spring.config;
 
-import com.jessin.practice.dubbo.processor.ReferenceBeanPostProcessor;
-import com.jessin.practice.dubbo.processor.Service;
-import com.jessin.practice.dubbo.processor.ServiceBeanPostProcessor;
+import com.jessin.practice.dubbo.spring.processor.ReferenceBeanPostProcessor;
+import com.jessin.practice.dubbo.spring.processor.Service;
+import com.jessin.practice.dubbo.spring.processor.ServiceBeanPostProcessor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -101,7 +101,6 @@ public class MiniDubboAutoConfiguration {
         }
 
     }
-
 
     private static MiniDubboProperties getMiniDubboProperties(Environment environment) {
         MiniDubboProperties miniDubboProperties = Binder.get(environment) //首先要绑定配置器

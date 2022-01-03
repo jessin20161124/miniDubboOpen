@@ -63,7 +63,7 @@ public class NettyServer {
 
 
     /**
-     * todo 关闭时调用，客户端也得关闭
+     * 关闭时调用，客户端也得关闭
      * dubbo shutdown hook
      */
     public void close() {
