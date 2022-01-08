@@ -4,6 +4,7 @@ import com.jessin.practice.dubbo.exporter.DubboExporter;
 import com.jessin.practice.dubbo.invoker.RpcInvocation;
 import com.jessin.practice.dubbo.transport.Request;
 import com.jessin.practice.dubbo.transport.Response;
+import com.jessin.practice.dubbo.utils.StringUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
@@ -85,7 +86,7 @@ public class NettyServerHandler extends ChannelDuplexHandler {
         Object obj = DubboExporter.getService(rpcInvocation);
         if (obj == null) {
             response.setException(true);
-            response.setResult(new RuntimeException("no provider"));
+            response.setResult(StringUtils.toString(new RuntimeException("no provider")));
             // 通过原来客户端通道发送出去，这里会走编码
             ctx.writeAndFlush(response);
             return;
@@ -101,7 +102,8 @@ public class NettyServerHandler extends ChannelDuplexHandler {
                 // 服务端如果返回的是future类型，最终返回的是future具体的值
                 ((CompletableFuture) responseData).whenComplete((result, exception) -> {
                     if (exception != null) {
-                        response.setResult(exception);
+                        response.setException(true);
+                        response.setResult(StringUtils.toString((Throwable)exception));
                     } else {
                         response.setResult(result);
                     }
@@ -117,7 +119,7 @@ public class NettyServerHandler extends ChannelDuplexHandler {
         } catch (Exception e) {
             log.error("调用dubbo异常：{}", rpcInvocation, e);
             response.setException(true);
-            response.setResult(e);
+            response.setResult(StringUtils.toString(e));
         }
         // 通过原来客户端通道发送出去，这里会走编码
         ctx.writeAndFlush(response);

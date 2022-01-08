@@ -62,6 +62,8 @@ public class BaseDecoder extends ByteToMessageDecoder {
             //  所以需要往下传递，然后以response的方式返回给客户端
             byte flag = in.readByte();
             byte[] realData = new byte[totalBytes - 1];
+            // 放到前面来，防止反序列化出错，导致这个字段没有清除，下次继续读取body...
+            totalBytes = -1;
             in.readBytes(realData);
             Object req;
             if (flag == Constants.REQUEST) {
@@ -72,7 +74,6 @@ public class BaseDecoder extends ByteToMessageDecoder {
                 throw new UnsupportedOperationException("flag unknown:" + flag);
             }
             out.add(req);
-            totalBytes = -1;
         }
         logger.info("读取字节个数：{}，剩余字节个数：{}", readableBytes, secondReadableBytes);
     }

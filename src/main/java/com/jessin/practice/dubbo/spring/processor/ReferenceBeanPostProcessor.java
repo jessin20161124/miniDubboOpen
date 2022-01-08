@@ -41,7 +41,8 @@ public class ReferenceBeanPostProcessor extends InstantiationAwareBeanPostProces
                     log.info("尝试注入接口代理，bean:{} 属性为：{}", beanName, field.getName());
                     // 私有属性，必须设置为可访问
                     field.setAccessible(true);
-                    // todo 挪到底层去
+                    // todo bugfix，这里可能版本不一样，或者超时时间等不一样，不能复用，需要挪到底层去，测试两个相同的@Reference!!
+                    //  RegistryDirectory只关注providerPath变化即可，RegistryDirectory可以复用，不要往RegistryDirectory传递interfaceConfig
                     // 需要销毁
                     InterfaceConfig interfaceConfig = transform(ref);
                     // 对于reference完全一样的(group+className，zk路径，version在服务端运行时才会校验)，缓存一份就可以了

@@ -1,6 +1,8 @@
 package com.jessin.practice.dubbo.transport;
 
 import com.google.common.collect.Lists;
+import com.jessin.practice.dubbo.exception.DubboException;
+import com.jessin.practice.dubbo.utils.StringUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -9,6 +11,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * zk版本需要与服务端一致，支持cancel，支持注册callback，
@@ -16,6 +19,7 @@ import java.util.concurrent.TimeUnit;
  * @Author: jessin
  * @Date: 19-11-25 下午10:44
  */
+@Slf4j
 public class DefaultFuture {
 
     private static final RuntimeException TIMEOUT_EXCEPTION = new RuntimeException("超时了");
@@ -43,8 +47,15 @@ public class DefaultFuture {
             Response response = new Response();
             response.setId(request.getId());
             response.setException(true);
-            response.setResult(TIMEOUT_EXCEPTION);
-            setResponse(response);
+            response.setResult(StringUtils.toString(TIMEOUT_EXCEPTION));
+            if (id2FutureMap.containsKey(request.getId())) {
+                log.warn("客户端定时器检测到超时没有回复，自动抛出异常：{}", request);
+            }
+            try {
+                setResponse(response);
+            } catch (Exception e) {
+                log.error("auto error", e);
+            }
         }, timeout, TimeUnit.MILLISECONDS);
     }
 
@@ -70,8 +81,8 @@ public class DefaultFuture {
                 throw TIMEOUT_EXCEPTION;
             }
         }
-        if (response.getResult() instanceof Exception) {
-            throw new RuntimeException((Exception)response.getResult());
+        if (response.isException()) {
+            throw new DubboException((String)response.getResult());
         }
         return response;
     }
@@ -85,7 +96,7 @@ public class DefaultFuture {
         countDownLatch.countDown();
         callbackList.forEach((callback -> {
             if (response.isException()) {
-                callback.finish(null, (Exception)response.getResult());
+                callback.finish(null, new DubboException((String)response.getResult()));
             } else {
                 callback.finish(response.getResult(), null);
             }

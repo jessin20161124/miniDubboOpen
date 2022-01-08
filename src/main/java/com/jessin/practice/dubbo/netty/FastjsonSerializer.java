@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.parser.ParserConfig;
-import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.jessin.practice.dubbo.exporter.DubboExporter;
 import com.jessin.practice.dubbo.invoker.RpcInvocation;
 import com.jessin.practice.dubbo.transport.DefaultFuture;
@@ -13,8 +12,8 @@ import com.jessin.practice.dubbo.transport.Response;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
@@ -48,7 +47,7 @@ public class FastjsonSerializer implements Serializer {
      */
     private static ParserConfig parserConfig = new ParserConfig();
     static {
-        parserConfig.setAutoTypeSupport(true);
+    //    parserConfig.setAutoTypeSupport(true);
     }
     private static final ConcurrentMap<String, Method> NAME_METHODS_CACHE = new ConcurrentHashMap<String, Method>();
     private static final ConcurrentMap<Class<?>, ConcurrentMap<String, Field>> CLASS_FIELD_CACHE = new ConcurrentHashMap<Class<?>, ConcurrentMap<String, Field>>();
@@ -58,8 +57,8 @@ public class FastjsonSerializer implements Serializer {
         try {
             // 序列化时，把类信息带上，保证泛化信息也带上，正常的话需要带上的
             // 例如Map<String, UserParam>，则value也会带上UserParam信息，可以反序列化成功
-            String jsonStr = JSON.toJSONString(msg, SerializerFeature.WriteClassName);
-//            String jsonStr = JSON.toJSONString(msg);
+   //         String jsonStr = JSON.toJSONString(msg, SerializerFeature.WriteClassName);
+            String jsonStr = JSON.toJSONString(msg);
             byte[] wordBytes = jsonStr.getBytes(StandardCharsets.UTF_8.name());
             return wordBytes;
         } catch (UnsupportedEncodingException e) {
@@ -187,53 +186,59 @@ public class FastjsonSerializer implements Serializer {
                 });
                 return newMap;
             } else if (clazzType.isInterface()) {
-                // todo 如果是接口，泛化调用的话，使用的是jdk代理。这里暂时使用autotype
-                // 如果类型是hashMap，会报错，http://blog.kail.xyz/post/2019-06-02/other/json.toJavaObject.html
-                // result[i] = ((JSONObject) arg).toJavaObject(argsType[i]);
-                // beanUtils.copy???MapStruct
-                // 复杂对象也可能带有泛型信息
-//                Object obj = JSON.parseObject(JSON.toJSONString(arg), clazzType);
+                // todo 如果是接口，泛化调用的话，使用的是jdk代理。这里暂时使用autotype，但是provider未必有这个类，可能会报错
                 return arg;
             } else {
-
+                // 如果类型是hashMap，会报错，http://blog.kail.xyz/post/2019-06-02/other/json.toJavaObject.html
+                // result[i] = ((JSONObject) arg).toJavaObject(clazzType);
+                // beanUtils.copy???MapStruct
+                // 复杂对象也可能带有泛型信息
                 Object dest;
-                try {
-                     dest = clazzType.newInstance();
-                } catch (Exception e) {
-                    throw new RuntimeException("复杂对象反序列化失败", e);
+                if (genericType != null) {
+                    dest = JSON.parseObject(JSON.toJSONString(arg), genericType);
+                } else {
+                    dest = JSON.parseObject(JSON.toJSONString(arg), clazzType);
                 }
-                Map oldMap = (Map)arg;
-                oldMap.forEach((key, value) -> {
-                    if (value == null || !(key instanceof String)) {
-                        return;
-                    }
-                    Method setterMethod = getSetterMethod(dest.getClass(), (String)key, value.getClass());
-                    if (setterMethod != null) {
-                        if (!setterMethod.isAccessible()) {
-                            setterMethod.setAccessible(true);
-                        }
-                        Object newValue = convert(value, setterMethod.getParameterTypes()[0], setterMethod.getGenericParameterTypes()[0]);
-                        try {
-                            setterMethod.invoke(dest, newValue);
-                        } catch (Exception e) {
-                            String exceptionDescription = "Failed to set pojo " + dest.getClass().getSimpleName() + " property " + key
-                                    + " value " + value + "(" + value.getClass() + "), cause: " + e.getMessage();
-                            log.error(exceptionDescription, e);
-                            throw new RuntimeException(exceptionDescription, e);
-                        }
-                    } else {
-                        Field field = getField(dest.getClass(), (String)key);
-                        if (field != null) {
-                            Object newValue = convert(value, field.getType(), field.getGenericType());
-                            field.setAccessible(true);
-                            try {
-                                field.set(dest, newValue);
-                            } catch (IllegalAccessException e) {
-                                throw new RuntimeException("Failed to set field " + key + " of pojo " + dest.getClass().getName() + " : " + e.getMessage(), e);
-                            }
-                        }
-                    }
-                });
+
+//                try {
+//                     dest = clazzType.newInstance();
+//                } catch (Exception e) {
+//                    throw new RuntimeException("复杂对象反序列化失败", e);
+//                }
+//                Map oldMap = (Map)arg;
+//                oldMap.forEach((key, value) -> {
+//                    if (value == null || !(key instanceof String)) {
+//                        return;
+//                    }
+                      // Result<T>，如果没有继承的话，例如Result<User>，User类型会丢失，
+//                   // https://www.jianshu.com/p/6bb9b8d6ee7a
+//                    Method setterMethod = getSetterMethod(dest.getClass(), (String)key, value.getClass());
+//                    if (setterMethod != null) {
+//                        if (!setterMethod.isAccessible()) {
+//                            setterMethod.setAccessible(true);
+//                        }
+//                        Object newValue = convert(value, setterMethod.getParameterTypes()[0], setterMethod.getGenericParameterTypes()[0]);
+//                        try {
+//                            setterMethod.invoke(dest, newValue);
+//                        } catch (Exception e) {
+//                            String exceptionDescription = "Failed to set pojo " + dest.getClass().getSimpleName() + " property " + key
+//                                    + " value " + value + "(" + value.getClass() + "), cause: " + e.getMessage();
+//                            log.error(exceptionDescription, e);
+//                            throw new RuntimeException(exceptionDescription, e);
+//                        }
+//                    } else {
+//                        Field field = getField(dest.getClass(), (String)key);
+//                        if (field != null) {
+//                            Object newValue = convert(value, field.getType(), field.getGenericType());
+//                            field.setAccessible(true);
+//                            try {
+//                                field.set(dest, newValue);
+//                            } catch (IllegalAccessException e) {
+//                                throw new RuntimeException("Failed to set field " + key + " of pojo " + dest.getClass().getName() + " : " + e.getMessage(), e);
+//                            }
+//                        }
+//                    }
+//                });
                 return dest;
             }
         } else if (arg instanceof JSONArray) {
@@ -241,10 +246,14 @@ public class FastjsonSerializer implements Serializer {
             if (clazzType.isArray()) {
                 Class elementType = clazzType.getComponentType();
                 int len = ((JSONArray)arg).size();
-                // todo 数组一定没有泛型类型吗？genericType
                 Object dest = Array.newInstance(elementType, len);
+
+                Type elementGenericType = null;
+                if (genericType instanceof GenericArrayType) {
+                    elementGenericType = ((GenericArrayType)genericType).getGenericComponentType();
+                }
                 for (int i = 0; i < len; i++) {
-                    Object newResult = convert(((JSONArray)arg).get(i), elementType, null);
+                    Object newResult = convert(((JSONArray)arg).get(i), elementType, elementGenericType);
                     Array.set(dest, i, newResult);
                 }
                 return dest;
@@ -267,63 +276,63 @@ public class FastjsonSerializer implements Serializer {
         }
     }
 
-    private static Method getSetterMethod(Class<?> cls, String property, Class<?> valueCls) {
-        String name = "set" + property.substring(0, 1).toUpperCase() + property.substring(1);
-        Method method = NAME_METHODS_CACHE.get(cls.getName() + "." + name + "(" + valueCls.getName() + ")");
-        if (method == null) {
-            try {
-                method = cls.getMethod(name, valueCls);
-            } catch (NoSuchMethodException e) {
-                for (Method m : cls.getMethods()) {
-                    if (isBeanPropertyWriteMethod(m) && m.getName().equals(name)) {
-                        method = m;
-                    }
-                }
-            }
-            if (method != null) {
-                NAME_METHODS_CACHE.put(cls.getName() + "." + name + "(" + valueCls.getName() + ")", method);
-            }
-        }
-        return method;
-    }
+//    private static Method getSetterMethod(Class<?> cls, String property, Class<?> valueCls) {
+//        String name = "set" + property.substring(0, 1).toUpperCase() + property.substring(1);
+//        Method method = NAME_METHODS_CACHE.get(cls.getName() + "." + name + "(" + valueCls.getName() + ")");
+//        if (method == null) {
+//            try {
+//                method = cls.getMethod(name, valueCls);
+//            } catch (NoSuchMethodException e) {
+//                for (Method m : cls.getMethods()) {
+//                    if (isBeanPropertyWriteMethod(m) && m.getName().equals(name)) {
+//                        method = m;
+//                    }
+//                }
+//            }
+//            if (method != null) {
+//                NAME_METHODS_CACHE.put(cls.getName() + "." + name + "(" + valueCls.getName() + ")", method);
+//            }
+//        }
+//        return method;
+//    }
 
-    public static boolean isBeanPropertyWriteMethod(Method method) {
-        return method != null
-                && Modifier.isPublic(method.getModifiers())
-                && !Modifier.isStatic(method.getModifiers())
-                && method.getDeclaringClass() != Object.class
-                && method.getParameterTypes().length == 1
-                && method.getName().startsWith("set")
-                && method.getName().length() > 3;
-    }
+//    public static boolean isBeanPropertyWriteMethod(Method method) {
+//        return method != null
+//                && Modifier.isPublic(method.getModifiers())
+//                && !Modifier.isStatic(method.getModifiers())
+//                && method.getDeclaringClass() != Object.class
+//                && method.getParameterTypes().length == 1
+//                && method.getName().startsWith("set")
+//                && method.getName().length() > 3;
+//    }
 
-    private static Field getField(Class<?> cls, String fieldName) {
-        Field result = null;
-        if (CLASS_FIELD_CACHE.containsKey(cls) && CLASS_FIELD_CACHE.get(cls).containsKey(fieldName)) {
-            return CLASS_FIELD_CACHE.get(cls).get(fieldName);
-        }
-        try {
-            result = cls.getDeclaredField(fieldName);
-            result.setAccessible(true);
-        } catch (NoSuchFieldException e) {
-            for (Field field : cls.getFields()) {
-                if (fieldName.equals(field.getName()) && isPublicInstanceField(field)) {
-                    result = field;
-                    break;
-                }
-            }
-        }
-        if (result != null) {
-            ConcurrentMap<String, Field> fields = CLASS_FIELD_CACHE.get(cls);
-            if (fields == null) {
-                fields = new ConcurrentHashMap<String, Field>();
-                CLASS_FIELD_CACHE.putIfAbsent(cls, fields);
-            }
-            fields = CLASS_FIELD_CACHE.get(cls);
-            fields.putIfAbsent(fieldName, result);
-        }
-        return result;
-    }
+//    private static Field getField(Class<?> cls, String fieldName) {
+//        Field result = null;
+//        if (CLASS_FIELD_CACHE.containsKey(cls) && CLASS_FIELD_CACHE.get(cls).containsKey(fieldName)) {
+//            return CLASS_FIELD_CACHE.get(cls).get(fieldName);
+//        }
+//        try {
+//            result = cls.getDeclaredField(fieldName);
+//            result.setAccessible(true);
+//        } catch (NoSuchFieldException e) {
+//            for (Field field : cls.getFields()) {
+//                if (fieldName.equals(field.getName()) && isPublicInstanceField(field)) {
+//                    result = field;
+//                    break;
+//                }
+//            }
+//        }
+//        if (result != null) {
+//            ConcurrentMap<String, Field> fields = CLASS_FIELD_CACHE.get(cls);
+//            if (fields == null) {
+//                fields = new ConcurrentHashMap<String, Field>();
+//                CLASS_FIELD_CACHE.putIfAbsent(cls, fields);
+//            }
+//            fields = CLASS_FIELD_CACHE.get(cls);
+//            fields.putIfAbsent(fieldName, result);
+//        }
+//        return result;
+//    }
 
     private static Type getGenericClassByIndex(Type genericType, int index) {
         // 泛型已经被擦除，这里通过方法来获取参数的泛型类型
@@ -342,12 +351,12 @@ public class FastjsonSerializer implements Serializer {
         return clazz;
     }
 
-    public static boolean isPublicInstanceField(Field field) {
-        return Modifier.isPublic(field.getModifiers())
-                && !Modifier.isStatic(field.getModifiers())
-                && !Modifier.isFinal(field.getModifiers())
-                && !field.isSynthetic();
-    }
+//    public static boolean isPublicInstanceField(Field field) {
+//        return Modifier.isPublic(field.getModifiers())
+//                && !Modifier.isStatic(field.getModifiers())
+//                && !Modifier.isFinal(field.getModifiers())
+//                && !field.isSynthetic();
+//    }
 
     protected static Collection<Object> createCollection(Class<? extends Collection> collectionType, int initialCapacity) {
         if (!collectionType.isInterface()) {
