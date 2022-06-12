@@ -12,6 +12,12 @@ import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 
 /**
+ * todo 注意
+ *      ctx->write，继续执行下一个handler?
+ *      channel->write，从head handler开始执行？
+ *      的区别
+ *      write和writeFlush的区别，是否触发下一个handler?
+ *
  * client重复建连，需要共享
  * @Author: jessin
  * @Date: 19-11-25 下午10:25
@@ -48,7 +54,7 @@ public class NettyClientHandler extends ChannelDuplexHandler {
     }
 
     /**
-     * 发送消息前进行拦截，oubound，只有channel.writeAndFlush()才能起作用，active里直接用ctx不起作用
+     * 发送消息前进行拦截，oubound，只有channel.writeAndFlush()才能触发，也就是需要flush?，active里直接用ctx不起作用
      * @param ctx
      * @param msg
      * @param promise

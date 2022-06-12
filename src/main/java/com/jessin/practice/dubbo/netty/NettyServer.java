@@ -63,6 +63,7 @@ public class NettyServer {
 
 
     /**
+     * todo 非spring托管的，也要支持资源释放
      * 关闭时调用，客户端也得关闭
      * dubbo shutdown hook
      */

@@ -42,6 +42,7 @@ public class DefaultFuture {
         this.request = request;
         this.timeout = timeout;
         id2FutureMap.put(request.getId(), this);
+        // todo 需要在退出时cancel？
         // 如果没有收到响应，应该设置超时移除。不然map会无限扩大
         scheduledExecutorService.schedule(() -> {
             Response response = new Response();
@@ -74,7 +75,7 @@ public class DefaultFuture {
             try {
                 countDownLatch.await(waitMillis, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
-                // 忽略中断
+                // todo 忽略中断，是否需要考虑进程退出，直接结束
                 e.printStackTrace();
             }
             if (System.currentTimeMillis() - start > waitMillis) {

@@ -37,6 +37,10 @@ public class BaseDecoder extends ByteToMessageDecoder {
     private int totalBytes = -1;
 
     /**
+     * todo 如何防止攻击，例如读取了一部分异常的数据，需要丢弃异常数据，保证处理正常的数据
+     *       例如使用了其他协议进行建联
+     *       magic code可以解决这个问题？crc校验
+     *
      * Decode the from one {@link ByteBuf} to an other. This method will be called till either the input
      * {@link ByteBuf} has nothing to read when return from this method or till nothing was read from the input
      * {@link ByteBuf}.

@@ -35,7 +35,12 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * todo protobuf，序列化需要实现跨语言，例如jdk序列化不支持跨语言
  * https://blog.csdn.net/fly910905/article/details/81504388
- * 对于调用服务端异常时，会返回异常栈，需要开启自动化类型支持，否则反序列化会报错，需要注意
+ * 对于调用服务端异常时，会返回异常栈，需要开启自动化类型支持，
+ * 否则在下列场景下，反序列化得到的泛型为JSONObject，实际使用时会报错，需要注意
+ *
+ * 1、带有泛型信息，例如Map<String, UserParam>，则value的类型是UserParam，而不是JSONObject
+ * 2、使用Object类型，例如Response.result
+ *
  * @Author: jessin
  * @Date: 2021/12/30 9:33 下午
  */
@@ -67,10 +72,10 @@ public class FastjsonSerializer implements Serializer {
     }
 
     /**
-     * 由于fastjson在开启autoType功能时，仍然有部分未带@type 类型信息的情况，例如List<User>，这里需要依据本地方法进行反序列化
-     *   可以利用接收方方法信息反射重建，通过本地方法的返回类型进行反序列化
-     *    Response.result字段为JSONObject。
-     *    返回list/map/int,A<V>，返回值也直接得到了信息，不需要反序列化了
+     *  由于fastjson在开启autoType功能时，todo（这个需要看下为什么有问题） 仍然有部分未带@type 类型信息的情况，例如List<User>，
+     *  这里需要依据本地方法进行反序列化，可以利用接收方方法信息反射重建，通过本地方法的返回类型进行反序列化
+     *  Response.result字段为JSONObject。
+     *  返回list/map/int,A<V>，返回值也直接得到了信息，不需要反序列化了
      *
      *
      * @param realData
@@ -134,7 +139,7 @@ public class FastjsonSerializer implements Serializer {
      * 原始参数信息已经丢失，例如UserParam/List<UserParam>，需要根据class转换回原来的才能反射调用
      *
      * 这里支持第一层collection/map，大于一层不支持，
-     * 例如不支持list<list<UserParam>>，map<string, map<string, userparam>
+     * 例如不支持list<list<UserParam>>，map<string, map<string, UserParam>
      * @param args 参数值
      * @param clazzTypes 方法上的参数类型，原来json序列后的参数类型已经丢失泛型类型
      * @param genericTypes  用于获取参数类型，带有泛型类型

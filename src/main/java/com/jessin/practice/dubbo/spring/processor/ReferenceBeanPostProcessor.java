@@ -28,7 +28,7 @@ public class ReferenceBeanPostProcessor extends InstantiationAwareBeanPostProces
     @Override
     public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName)
             throws BeansException {
-        // 父类中的@Reference呢？？方法是否支持这个注解注入？？
+        // 父类中的@Reference呢？？方法是否支持这个注解注入？？如果有aop是否有问题
         Field[] fields = bean.getClass().getDeclaredFields();
         for (Field field : fields) {
             boolean isExist = field.isAnnotationPresent(Reference.class);
@@ -37,7 +37,7 @@ public class ReferenceBeanPostProcessor extends InstantiationAwareBeanPostProces
                     if (!field.getType().isInterface()) {
                         throw new RuntimeException("dubbo依赖不是接口：" + field.getType().getName());
                     }
-                    Reference  ref = field.getAnnotation(Reference.class);
+                    Reference ref = field.getAnnotation(Reference.class);
                     log.info("尝试注入接口代理，bean:{} 属性为：{}", beanName, field.getName());
                     // 私有属性，必须设置为可访问
                     field.setAccessible(true);

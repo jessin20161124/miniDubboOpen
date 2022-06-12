@@ -46,7 +46,8 @@ public class NettyClient {
         this.ipAndPort = ipAndPort;
         connect();
         // 至少1秒运行一次
-        long duration = Math.min(Constants.HEARTBEAT_TIMEOUT_MILLIS / 3, 1000);
+        long duration = Math.max(Constants.HEARTBEAT_TIMEOUT_MILLIS / 3, 1000);
+        // todo cancel
         // 用delay而不是fixed，保证如果连接卡住了，还会休眠duration再重试
         scheduledExecutorService.scheduleWithFixedDelay(() -> {
             // 可能重入，和开始线程一起进入连接，或者在重连时，有业务线程获取状态，这里需要考虑并发。
@@ -146,6 +147,7 @@ public class NettyClient {
 
     /**
      * 关闭包括断开连接和销毁其他资源
+     * todo 这种关闭比较粗暴，是否等待一定时间再关闭？优雅关闭
      */
     public void close() {
         log.info("关闭访问服务的连接，销毁整个nettyClient：{}", ipAndPort);

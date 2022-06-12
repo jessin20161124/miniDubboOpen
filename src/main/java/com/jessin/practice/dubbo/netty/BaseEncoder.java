@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * todo 协议规范化
+ * todo 协议规范化，参考 https://www.cnblogs.com/monkey-xuan/p/15893604.html
  * @Author: jessin
  * @Date: 19-11-25 下午10:20
  */
@@ -17,6 +17,7 @@ public class BaseEncoder extends MessageToByteEncoder {
     private Logger logger = LoggerFactory.getLogger(getClass());
 
     /**
+     * todo 添加魔数，去掉无效请求
      * Encode a message into a {@link ByteBuf}. This method will be called for each written message that can be handled
      * by this encoder.
      *
