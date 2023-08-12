@@ -6,6 +6,9 @@ import lombok.Data;
 @Data
 public class RpcInvocation {
 
+    /**
+     * 服务级版本，而不是方法版本
+     */
     private String version;
 
     private String interfaceName;

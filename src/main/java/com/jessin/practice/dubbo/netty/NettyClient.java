@@ -28,14 +28,14 @@ public class NettyClient {
     /**
      * worker可以共用
      */
-    private EventLoopGroup worker = new NioEventLoopGroup();
+    private static final EventLoopGroup worker = new NioEventLoopGroup();
 
     private Channel socketChannel;
 
     private ConnectState state = ConnectState.INIT;
 
     // 多个client共享
-    private static NettyClientHandler clientHandler = new NettyClientHandler();
+    private static final NettyClientHandler clientHandler = new NettyClientHandler();
 
     /**
      * 每个client一个独立的定时线程....

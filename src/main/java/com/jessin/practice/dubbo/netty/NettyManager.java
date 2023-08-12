@@ -7,13 +7,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 对于同一个机器ip:port可以共享，可以使用缓存
+ * 引用计数法销毁
  *
  * @Author: jessin
  * @Date: 2021/10/27 2:23 PM
  */
 public class NettyManager {
-    private static Map<Integer, Pair<NettyServer, AtomicInteger>> serverMap = new ConcurrentHashMap<>();
-    private static Map<String, Pair<NettyClient, AtomicInteger>> clientMap = new ConcurrentHashMap<>();
+    private static final Map<Integer, Pair<NettyServer, AtomicInteger>> serverMap = new ConcurrentHashMap<>();
+    private static final Map<String, Pair<NettyClient, AtomicInteger>> clientMap = new ConcurrentHashMap<>();
+
+    private NettyManager() {
+
+    }
 
     public static NettyServer getNettyServer(Integer port) {
         // 双检锁，任何对象都可以作为锁
