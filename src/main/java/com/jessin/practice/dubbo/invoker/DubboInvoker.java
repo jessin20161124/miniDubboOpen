@@ -30,7 +30,7 @@ public class DubboInvoker {
         this.ipAndPort = ipAndPort;
         this.interfaceConfig = interfaceConfig;
         // 对于同一个机器可以共享，可以使用缓存
-        // todo 支持使用连接池，同一个机器可以建立多个连接，构成一个池子，随机使用，类似于jdbc连接池、redis连接池
+        // todo 支持使用连接池，同一个server机器可以建立多个连接，构成一个池子，随机使用，类似于jdbc连接池、http连接池、redis连接池
         nettyClient = NettyManager.getNettyClient(ipAndPort);
     }
 

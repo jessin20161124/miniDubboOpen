@@ -13,6 +13,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class RegistryManager {
 
+    private RegistryManager() {
+
+    }
     private static Map<String, Pair<RegistryService, AtomicInteger>> map = new ConcurrentHashMap<>();
 
     public static RegistryService getRegistryService(String registryAddress) {

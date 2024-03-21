@@ -13,6 +13,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DubboExporter {
     private static Map<String, Object> exportServiceMap = new ConcurrentHashMap();
 
+    private DubboExporter() {
+
+    }
+
     public static void exportService(String clazzName, InterfaceConfig interfaceConfig, Object ref) {
         String key = buildKey(clazzName, interfaceConfig.getVersion());
         exportServiceMap.put(key, ref);
