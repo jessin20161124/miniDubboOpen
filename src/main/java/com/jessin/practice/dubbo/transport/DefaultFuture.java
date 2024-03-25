@@ -73,6 +73,10 @@ public class DefaultFuture {
         long start = System.currentTimeMillis();
         while (response == null) {
             try {
+                // 返回值true表示成功得到了countDown，没有超时；false表示超时了
+                // todo 不用定时任务，用这个!false，表示超时，然后移除id2FutureMap好像也可以，但是这时就需要依赖调用方必须使用getResponse了，比较被动了
+                // todo 到点了，操作系统自然会唤醒这个线程，time_waiting状态，locksupport.park(wailMillis)
+                // todo 也可以使用synchronized wait和notify
                 countDownLatch.await(waitMillis, TimeUnit.MILLISECONDS);
             } catch (InterruptedException e) {
                 // todo 忽略中断，是否需要考虑进程退出，直接结束
